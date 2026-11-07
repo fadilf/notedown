@@ -49,6 +49,7 @@ import java.math.BigDecimal
         item { SettingsSection("Floating microphone") {
             SettingSwitch("Show near the keyboard", "Requires Notedown's accessibility service.", settings.overlay) { vm.flag("overlay", it) }
             SettingSwitch("Position on the left", "Places controls above the keyboard's left edge.", settings.left) { vm.flag("left", it) }
+            Text("Finished dictation is inserted at the cursor in whichever text field is focused when processing completes. If no supported field is focused, use Copy or history.", style = MaterialTheme.typography.bodySmall)
             Text("Android may briefly display the recording panel while enabling microphone access. Capture starts automatically, without another tap.", style = MaterialTheme.typography.bodySmall)
             Text("Recordings stop automatically after 10 minutes. WAV uploads are limited to 25 MB. A failed request keeps the recording for retry.", style = MaterialTheme.typography.bodySmall)
         } }

@@ -20,14 +20,17 @@ sealed interface DictationState {
     private val history: RecordingRepository, private val queue: TranscriptionRepository) {
     private val mutable = MutableStateFlow<DictationState>(DictationState.Idle)
     val state = mutable.asStateFlow()
-    var targetToken: String? = null
+    private val pendingInsertion = PendingTextInsertion()
+    fun consumeFocusedInsertionRequest(): Boolean = pendingInsertion.consume()
+    fun clearFocusedInsertionRequest() = pendingInsertion.clear()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    suspend fun start() {
+    suspend fun start(insertIntoFocusedField: Boolean = false) {
         if (mutable.value is DictationState.Recording || mutable.value == DictationState.Starting || mutable.value == DictationState.Saving || mutable.value is DictationState.Processing) return
+        pendingInsertion.begin(insertIntoFocusedField)
         mutable.value = DictationState.Starting
         try {
             mutable.value = DictationState.Recording(recorder.startRecording(settings.settings.first().wav))
-        } catch (e: Exception) { mutable.value = DictationState.Error("Microphone unavailable. Check permission and close other recording apps.") }
+        } catch (e: Exception) { pendingInsertion.clear(); mutable.value = DictationState.Error("Microphone unavailable. Check permission and close other recording apps.") }
     }
     suspend fun stop() {
         if (mutable.value !is DictationState.Recording) return
@@ -41,15 +44,16 @@ sealed interface DictationState {
             mutable.value = DictationState.Processing(id)
             scope.launch {
                 val result = history.transcript(id).filterNotNull().first { it.status in listOf("complete", "failed") }
+                if (result.status == "failed") pendingInsertion.clear()
                 mutable.value = if (result.status == "failed") DictationState.Error(result.errorMessage ?: "Transcription failed", recording.id)
                     else DictationState.Result(result.text, result.errorMessage ?: "Transcript saved")
             }
-        } catch (e: Exception) { mutable.value = DictationState.Error(if (savedId != null) "Recording saved. Select a model and retry from history." else "Could not finish this recording. Try again.", savedId) }
+        } catch (e: Exception) { pendingInsertion.clear(); mutable.value = DictationState.Error(if (savedId != null) "Recording saved. Select a model and retry from history." else "Could not finish this recording. Try again.", savedId) }
     }
     suspend fun cancel() {
         if (mutable.value !is DictationState.Recording && mutable.value != DictationState.Starting) return
-        recorder.cancelRecording(); targetToken = null; mutable.value = DictationState.Idle
+        recorder.cancelRecording(); pendingInsertion.clear(); mutable.value = DictationState.Idle
     }
-    fun startFailed() { mutable.value = DictationState.Error("Microphone access could not start. Reopen Notedown and check permissions.") }
-    fun dismiss() { if (mutable.value is DictationState.Result || mutable.value is DictationState.Error) { targetToken = null; mutable.value = DictationState.Idle } }
+    fun startFailed() { pendingInsertion.clear(); mutable.value = DictationState.Error("Microphone access could not start. Reopen Notedown and check permissions.") }
+    fun dismiss() { if (mutable.value is DictationState.Result || mutable.value is DictationState.Error) { pendingInsertion.clear(); mutable.value = DictationState.Idle } }
 }

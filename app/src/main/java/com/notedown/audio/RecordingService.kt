@@ -12,6 +12,7 @@ import kotlinx.coroutines.*
 import javax.inject.Inject
 
 @AndroidEntryPoint class RecordingService : Service() {
+    companion object { const val EXTRA_INSERT_INTO_FOCUSED_FIELD = "insertIntoFocusedField" }
     @Inject lateinit var sessions: RecordingSessionManager
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var limit: Job? = null
@@ -33,7 +34,7 @@ import javax.inject.Inject
                     if (Build.VERSION.SDK_INT >= 30) startForeground(10, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
                     else startForeground(10, notification)
                     scope.launch {
-                        sessions.start()
+                        sessions.start(intent?.getBooleanExtra(EXTRA_INSERT_INTO_FOCUSED_FIELD, false) == true)
                         if (sessions.state.value !is DictationState.Recording) { stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
                         else { limit?.cancel(); limit = scope.launch { delay(600000); sessions.stop(); stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() } }
                     }

@@ -10,8 +10,8 @@ Do not treat emulator unit/instrumentation results as proof of Samsung/Gboard co
 | Return to editor | Leave Accessibility Settings in Notedown's task after setup, switch to an editor, and tap the floating mic | Recording starts after one tap and the original editor returns; Settings is not brought forward |
 | Save/cancel | Stop after several seconds; repeat with Cancel | Stop retains private audio and queues STT; Cancel discards and makes no API request |
 | Modern foreground service | Record on Android 14–16, background app, use notification Stop/Cancel | Visible recording entry activity, microphone FGS indicator and controls; no background-start exceptions |
-| Insertion | Dictate into Gmail, Chrome and a messenger with text/selection before/after cursor | Only captured selection is replaced; surrounding text retained |
-| Focus safety | Switch field/app or edit original while processing; switch back | Changed target is not overwritten; transcript remains in history and Copy is available |
+| Insertion | Dictate into Gmail, Chrome and a messenger with text/selection before/after cursor | Current selection at completion is replaced; surrounding text retained |
+| Focus safety | Switch field/app or edit original while processing; switch back | Completion inserts into the currently focused field at its latest selection, preserving surrounding content; with no eligible field, use Copy/history |
 | Passwords | Focus password/PIN fields | No capture target or insertion |
 | Network errors | Airplane mode before Stop, invalid key, exhausted credits, rate limit, timeout, unsupported format | Audio retained, actionable status; offline queue resumes; explicit retry creates a version |
 | Models | Refresh catalog, choose unavailable model, retranscribe with another model | Availability warning; no silent model substitution or version overwrite |

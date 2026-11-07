@@ -49,18 +49,20 @@ class PersistenceTest {
         val fake = FakeRecorder()
         val settings = SettingsRepository(context)
         val manager = RecordingSessionManager(fake, settings, RecordingRepository(db.history()), TranscriptionRepository(context, db.history(), settings))
-        manager.start(); manager.start(); assertEquals(1, fake.starts); assertTrue(manager.state.value is DictationState.Recording)
+        manager.start(true); manager.start(); assertEquals(1, fake.starts); assertTrue(manager.state.value is DictationState.Recording)
         manager.cancel(); assertEquals(1, fake.cancels); assertEquals(DictationState.Idle, manager.state.value)
+        assertFalse(manager.consumeFocusedInsertionRequest())
         manager.cancel(); assertEquals(1, fake.cancels)
     }
     @Test fun stopSavesAudioBeforeSubmissionFailureAndIgnoresDuplicateStop() = runBlocking {
         val fake = FakeRecorder()
         val settings = SettingsRepository(context).apply { text("model", "") }
         val manager = RecordingSessionManager(fake, settings, RecordingRepository(db.history()), TranscriptionRepository(context, db.history(), settings))
-        manager.start(); manager.stop(); manager.stop()
+        manager.start(true); manager.stop(); manager.stop()
         assertNotNull(db.history().recording("r"))
         assertTrue(manager.state.value is DictationState.Error)
         assertEquals("r", (manager.state.value as DictationState.Error).recordingId)
+        assertFalse(manager.consumeFocusedInsertionRequest())
     }
     @Test fun cleanupFailurePersistsSuccessfulRawAndUsage() = runBlocking {
         recording(); val dao = db.history(); dao.insert(TranscriptionEntity("v", "r", 1, "stt"))

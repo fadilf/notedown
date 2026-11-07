@@ -24,18 +24,20 @@ import javax.inject.Inject
     private val insertion = TextInsertionManager()
     private lateinit var overlay: OverlayManager
     private var config = Settings()
-    private var insertedResult: DictationState.Result? = null
     override fun onServiceConnected() {
         overlay = OverlayManager(this, ::begin, { command("stop") }, { command("cancel") }, { id ->
             scope.launch { runCatching { queue.enqueue(id) }; sessions.dismiss() }
-        }, { sessions.dismiss(); insertion.clear(); render() })
+        }, { sessions.dismiss(); render() })
         scope.launch { settings.settings.collectLatest { config = it; render() } }
         scope.launch { sessions.state.collectLatest { state ->
-            if (state is DictationState.Result && insertedResult !== state) {
-                insertedResult = state
-                val success = insertion.insert(sessions.targetToken, state.text, focusedEditor()?.packageName?.toString())
-                insertion.clear()
-                if (success) { sessions.dismiss() }
+            if (state is DictationState.Result && sessions.consumeFocusedInsertionRequest()) {
+                if (insertion.insertIntoFocused(focusedEditor(), state.text)) {
+                    sessions.dismiss()
+                } else if (state.text.isNotBlank()) {
+                    android.widget.Toast.makeText(this@NotedownAccessibilityService,
+                        "Could not insert text. Transcript saved; tap Copy or open history.",
+                        android.widget.Toast.LENGTH_LONG).show()
+                }
             }
             render()
         } }
@@ -50,25 +52,13 @@ import javax.inject.Inject
             .firstOrNull { it.isEditable && !it.isPassword && it.packageName?.toString() != packageName }
     }
     private fun begin() {
-        val node = focusedEditor()
-        sessions.targetToken = insertion.capture(node)
-        if (sessions.targetToken == null) return
+        if (focusedEditor() == null) return
         // Do not bring Notedown's task (possibly still showing permission Settings)
         // in front of the editor. This short-lived task is removed after mic startup.
         startActivity(CaptureActivity.overlayIntent(this))
     }
     private fun command(action: String) { startService(Intent(this, RecordingService::class.java).setAction(action)) }
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event?.eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED) insertion.invalidateIfDifferent(event.source)
-        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            val pkg = event.packageName?.toString()
-            if (sessions.targetToken != null && pkg != packageName && pkg != null &&
-                windows.none { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD && it.root?.packageName?.toString() == pkg }) {
-                insertion.invalidateIfDifferent(focusedEditor())
-            }
-        }
-        render()
-    }
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) { render() }
     private fun render() {
         if (!::overlay.isInitialized) return
         val state = sessions.state.value
@@ -80,6 +70,6 @@ import javax.inject.Inject
         val elapsed = if (state is DictationState.Recording) (System.currentTimeMillis() - state.session.startedAt) / 1000 else 0
         overlay.show(state, ime.top, config.left, elapsed)
     }
-    override fun onInterrupt() { if (::overlay.isInitialized) overlay.hide(); insertion.clear() }
-    override fun onDestroy() { scope.cancel(); if (::overlay.isInitialized) overlay.hide(); insertion.clear(); super.onDestroy() }
+    override fun onInterrupt() { if (::overlay.isInitialized) overlay.hide(); sessions.clearFocusedInsertionRequest() }
+    override fun onDestroy() { scope.cancel(); if (::overlay.isInitialized) overlay.hide(); sessions.clearFocusedInsertionRequest(); super.onDestroy() }
 }

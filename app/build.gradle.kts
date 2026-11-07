@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.notedown"
     compileSdk = 37
-    defaultConfig { applicationId = "com.notedown"; minSdk = 29; targetSdk = 36; versionCode = 2; versionName = "1.0.1"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    defaultConfig { applicationId = "com.notedown"; minSdk = 29; targetSdk = 36; versionCode = 3; versionName = "1.0.2"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     buildTypes {
         release {
             isMinifyEnabled = true

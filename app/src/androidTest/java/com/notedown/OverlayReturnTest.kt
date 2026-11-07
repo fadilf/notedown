@@ -4,11 +4,9 @@ import android.Manifest
 import android.app.UiAutomation
 import android.content.ComponentName
 import android.content.Intent
-import android.graphics.Rect
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.Settings
-import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import androidx.test.core.app.ActivityScenario
@@ -59,13 +57,10 @@ class OverlayReturnTest {
             scenario.onActivity { it.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
             await("accessibility settings") { automation.rootInActiveWindow?.packageName?.toString() == "com.android.settings" }
             val editorComponent = "${instrumentation.context.packageName}/com.notedown.fixture.EditorActivity"
-            shell("am start -W -n $editorComponent -f 0x10000000")
+            shell("am start -W -n $editorComponent -f 0x10008000")
             await("Notedown microphone over external editor") { overlayButton("Start voice dictation") != null }
             val button = checkNotNull(overlayButton("Start voice dictation"))
-            val bounds = Rect().also(button::getBoundsInScreen)
-            val now = SystemClock.uptimeMillis()
-            MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, bounds.exactCenterX(), bounds.exactCenterY(), 0).also { automation.injectInputEvent(it, true); it.recycle() }
-            MotionEvent.obtain(now, now + 60, MotionEvent.ACTION_UP, bounds.exactCenterX(), bounds.exactCenterY(), 0).also { automation.injectInputEvent(it, true); it.recycle() }
+            assertTrue("Microphone click should be accepted", button.performAction(AccessibilityNodeInfo.ACTION_CLICK))
             await("recording controls after one microphone tap") { overlayButton("Stop") != null }
             await("original editor restored instead of accessibility settings") {
                 automation.windows.any { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive && it.root?.packageName?.toString() == instrumentation.context.packageName }

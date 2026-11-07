@@ -3,6 +3,7 @@ package com.notedown
 import com.notedown.accessibility.insertAtSelection
 import com.notedown.api.*
 import com.notedown.domain.cleanupOrRaw
+import com.notedown.domain.PendingTextInsertion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.SerializationException
@@ -15,6 +16,24 @@ import retrofit2.Response
 
 class CoreTest {
     private val json = Json { ignoreUnknownKeys = true }
+    @Test fun overlayCompletionIsDeliveredOnlyOnce() {
+        val request = PendingTextInsertion()
+        request.begin(true)
+        assertTrue(request.consume())
+        assertFalse(request.consume())
+    }
+    @Test fun inAppDictationAndHistoryDoNotRequestAutomaticInsertion() {
+        val request = PendingTextInsertion()
+        assertFalse(request.consume())
+        request.begin(true)
+        request.begin(false)
+        assertFalse(request.consume())
+    }
+    @Test fun cancelledRequestCannotPasteLater() {
+        val request = PendingTextInsertion()
+        request.begin(true); request.clear()
+        assertFalse(request.consume())
+    }
     @Test fun responseRetainsPreciseUsageAndIgnoresProviderExtensions() {
         val value = json.decodeFromString<TranscriptionResponse>("""{"text":"Hello","usage":{"cost":0.00000000123456789,"seconds":1.2,"input_tokens":4},"segments":[]}""")
         assertEquals("Hello", value.text)

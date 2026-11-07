@@ -56,7 +56,8 @@ import javax.inject.Inject
     }
     private fun begin() {
         // Called only while this visible, user-launched activity is resumed.
-        try { startForegroundService(Intent(this, RecordingService::class.java)) }
+        try { startForegroundService(Intent(this, RecordingService::class.java)
+            .putExtra(RecordingService.EXTRA_INSERT_INTO_FOCUSED_FIELD, intent.getBooleanExtra(EXTRA_OVERLAY, false))) }
         catch (_: RuntimeException) { android.widget.Toast.makeText(this, "Microphone could not start. Reopen Notedown and check permissions.", android.widget.Toast.LENGTH_LONG).show(); closeCapture() }
     }
     companion object {
