@@ -2,7 +2,9 @@ package com.notedown.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -12,13 +14,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.notedown.api.RouterModel
 import com.notedown.audio.AudioPlaybackManager
 import com.notedown.data.*
 import kotlinx.coroutines.delay
-import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.util.Date
 
 fun copyTranscript(context: android.content.Context, text: String) {
@@ -38,13 +44,15 @@ fun copyTranscript(context: android.content.Context, text: String) {
     val transcript = sorted.firstOrNull { it.id == selected } ?: sorted.firstOrNull()
     val text = if (showRaw) transcript?.rawText.orEmpty() else transcript?.text.orEmpty()
     val context = LocalContext.current
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val locale = LocalConfiguration.current.locales[0]
+    PaperCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(item.recording.createdAt)), modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
-                Text("${item.recording.durationMs / 1000}s · ${item.recording.audioFormat.uppercase()}", style = MaterialTheme.typography.labelMedium)
+                val date = Date(item.recording.createdAt)
+                Text("${SimpleDateFormat("MMM d", locale).format(date)} · ${android.text.format.DateFormat.getTimeFormat(context).format(date)}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${item.recording.durationMs / 1000}s · ${item.recording.audioFormat.uppercase()}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Box {
-                    IconButton(onClick = { actionsMenu = true }) { Icon(Icons.Outlined.MoreVert, "Recording options") }
+                    IconButton(onClick = { actionsMenu = true }) { Icon(Icons.Outlined.MoreVert, "Recording options", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                     DropdownMenu(expanded = actionsMenu, onDismissRequest = { actionsMenu = false }) {
                         DropdownMenuItem(text = { Text("Copy") }, leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) }, enabled = text.isNotBlank(), onClick = { actionsMenu = false; copyTranscript(context, text) })
                         DropdownMenuItem(text = { Text("Retranscribe") }, enabled = transcript?.status !in listOf("queued", "processing"), onClick = { actionsMenu = false; choosingModel = true })
@@ -52,13 +60,17 @@ fun copyTranscript(context: android.content.Context, text: String) {
                     }
                 }
             }
+            if (text.isNotBlank()) {
+                SelectionContainer { Text(text, maxLines = if (expanded) Int.MAX_VALUE else 5, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Serif, fontSize = 19.sp, lineHeight = 27.sp)) }
+                if (text.length > 200 || text.count { it == '\n' } > 4) TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Show less" else "Read more") }
+                if (transcript?.cleanedText != null) TextButton(onClick = { showRaw = !showRaw }) { Text(if (showRaw) "Show cleaned text" else "Show original transcript") }
+            } else Text(if (transcript?.status in listOf("queued", "processing")) "Queued or transcribing…" else "Audio saved on this device.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (player.current == item.recording.filePath) {
                 CompactPlayer(player, item.recording.filePath, item.recording.durationMs)
-            } else Row { FilledTonalIconButton(onClick = { player.play(item.recording.filePath) }) { Icon(Icons.Outlined.PlayArrow, "Play recording") }
-                Column(Modifier.padding(start = 12.dp, top = 4.dp)) {
-                    Text(transcript?.modelId ?: "Ready to transcribe", style = MaterialTheme.typography.labelLarge)
-                    Text(transcript?.status ?: "Saved locally", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                }
+            } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FilledTonalIconButton(onClick = { player.play(item.recording.filePath) }, modifier = Modifier.size(48.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape), colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.primary)) { Icon(Icons.Outlined.PlayArrow, "Play recording") }
+                Text(transcript?.modelId ?: "Ready to transcribe", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(transcript?.status ?: "Saved locally", modifier = Modifier.widthIn(max = 88.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
             }
             if (sorted.size > 1) {
                 var menu by remember { mutableStateOf(false) }
@@ -68,11 +80,6 @@ fun copyTranscript(context: android.content.Context, text: String) {
                     } }
                 }
             }
-            if (text.isNotBlank()) {
-                SelectionContainer { Text(text, maxLines = if (expanded) Int.MAX_VALUE else 5, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge) }
-                if (text.length > 200 || text.count { it == '\n' } > 4) TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Show less" else "Read more") }
-                if (transcript?.cleanedText != null) TextButton(onClick = { showRaw = !showRaw }) { Text(if (showRaw) "Show cleaned text" else "Show original transcript") }
-            } else Text(if (transcript?.status in listOf("queued", "processing")) "Queued or transcribing…" else "Audio saved on this device.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (item.recording.status == "recovered") Text("Recovered after an interruption. Unfinished audio may not be playable.", style = MaterialTheme.typography.bodySmall)
             transcript?.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         }

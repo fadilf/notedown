@@ -18,8 +18,10 @@ APKs appear here after the first automated release. If no release is available y
 
 - Dictate into text fields in other apps.
 - Keep recordings and transcripts so you can listen, copy, or transcribe again.
+- Browse white paper-style recording cards on a warm cream background, with dark brown serif transcripts and amber accents. This paper theme stays consistent even when Android uses dark mode. Settings is available in the bottom navigation.
 - Choose a transcription model through OpenRouter.
 - Optionally clean up the transcript with a separate AI model.
+- Optionally skip long silences locally before transcription, keeping the original recording.
 - View API-reported spending in the usage screen.
 
 ## What you need
@@ -65,6 +67,7 @@ Requests may cost money. The usage screen shows exact API-reported costs and mar
 - Automatic insertion requires a focused, enabled text field; password fields are excluded.
 - Offline recordings wait for connectivity. Failed API requests require an explicit retry from history: even a timed-out request may already have cost money.
 - Each transcription or retry creates a new version. Queued requests keep the settings they were created with. If cleanup fails, the raw transcript remains usable.
+- **Skip silence before transcription** is off by default in Settings. It uses bundled, on-device Silero speech detection to shorten an upload copy, retaining about half a second around detected speech. Original recordings and playback remain unchanged. Shortened uploads use WAV and may be larger than compressed M4A; cost savings depend on provider billing. If no speech is detected or nothing can be removed, the original upload path is used to avoid discarding quiet speech. Detection errors stop before the API request; retry explicitly or disable the option. Queued work keeps its saved silence-removal preference.
 - Android force-stop pauses background work until you reopen the app. Interrupted audio is recovered when possible, but unfinished recordings may be unplayable.
 
 ## Development

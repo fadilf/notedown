@@ -84,7 +84,7 @@ class PersistenceTest {
         val api = FakeApi(); val keys = ApiKeyStorage(context).apply { write("local-test") }
         // Existing audio is checked by the STT service, so resume from a persisted raw result.
         dao.update(dao.transcript("v")!!.copy(rawText = "raw speech"))
-        val pipeline = TranscriptionPipeline(dao, TranscriptionService(api, keys), CleanupService(api, keys))
+        val pipeline = TranscriptionPipeline(dao, TranscriptionService(api, keys, SilenceFilter(context)), CleanupService(api, keys))
         pipeline.run("v", Settings(cleanup = true, cleanupModel = "cleanup"))
         assertEquals("complete", dao.transcript("v")!!.status)
         assertEquals("raw speech", dao.transcript("v")!!.text)
@@ -93,7 +93,7 @@ class PersistenceTest {
     @Test fun missingAudioIsSavedAsRetryableFailure() = runBlocking {
         recording(); val dao = db.history(); dao.insert(TranscriptionEntity("v", "r", 1, "stt"))
         val api = FakeApi(); val keys = ApiKeyStorage(context)
-        TranscriptionPipeline(dao, TranscriptionService(api, keys), CleanupService(api, keys)).run("v", Settings(model = "stt"))
+        TranscriptionPipeline(dao, TranscriptionService(api, keys, SilenceFilter(context)), CleanupService(api, keys)).run("v", Settings(model = "stt"))
         assertEquals("failed", dao.transcript("v")!!.status); assertNotNull(dao.recording("r")); assertEquals(0, api.sttCalls)
     }
     private class FakeRecorder : AudioRecorder {

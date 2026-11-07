@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "Taildrop to fadil-s23": {
+      "command": "tailscale file cp /home/fadile/Code/notedown/app/build/outputs/apk/debug/app-debug.apk fadil-s23:"
+    }
+  }
+}

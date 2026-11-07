@@ -29,21 +29,32 @@ fun safeApiError(error: Throwable): String = when (error) {
     else -> "Request failed. Audio is saved; check your model and settings."
 }
 fun reportedCost(usage: JsonObject?): String? = usage?.get("cost")?.jsonPrimitive?.contentOrNull?.let { runCatching { it.toBigDecimal().toPlainString() }.getOrNull() }
-class TranscriptionService @Inject constructor(private val api: OpenRouterApi, private val keys: ApiKeyStorage) {
+class TranscriptionService @Inject constructor(private val api: OpenRouterApi, private val keys: ApiKeyStorage,
+    private val silenceFilter: com.notedown.audio.SilenceFilter) {
     suspend fun transcribe(recording: RecordingEntity, settings: Settings): TranscriptionResponse = withContext(Dispatchers.IO) {
         require(settings.model.isNotBlank()) { "Select a transcription model in Settings." }
         val file = File(recording.filePath)
         require(file.isFile && file.length() > 44) { "Recording is empty or missing." }
         require(file.length() < 25L * 1024 * 1024) { "Recording exceeds the 25 MB upload limit." }
-        val converted = if (settings.wav && recording.audioFormat != "wav") File.createTempFile("notedown-converted-", ".wav", file.parentFile) else null
+        val converted = if ((settings.wav || settings.skipSilence) && recording.audioFormat != "wav") File.createTempFile("notedown-converted-", ".wav", file.parentFile) else null
+        var filtered: File? = null
         try {
         if (converted != null) com.notedown.audio.WavConverter().convert(file, converted)
-        val upload = converted ?: file
+        var upload = converted ?: file
+        if (settings.skipSilence) {
+            val candidate = File.createTempFile("notedown-converted-trimmed-", ".wav", file.parentFile)
+            filtered = candidate
+            val trimmed = try { silenceFilter.trim(upload, candidate) }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { throw IllegalStateException("Silence removal failed. Retry or turn off Skip silence in Settings.") }
+            if (trimmed) upload = candidate else if (!settings.wav) upload = file
+        }
+        require(upload.length() < 25L * 1024 * 1024) { "Prepared audio exceeds the 25 MB upload limit." }
         val mime = if (upload.extension == "wav") "audio/wav" else "audio/mp4"
         api.transcribe("Bearer ${keys.read() ?: error("Add an API key in Settings.")}", settings.model.toRequestBody("text/plain".toMediaType()),
             MultipartBody.Part.createFormData("file", upload.name, upload.asRequestBody(mime.toMediaType())),
             settings.language.takeIf { it.isNotBlank() }?.toRequestBody("text/plain".toMediaType()))
-        } finally { converted?.delete() }
+        } finally { filtered?.delete(); converted?.delete() }
     }
 }
 class CleanupService @Inject constructor(private val api: OpenRouterApi, private val keys: ApiKeyStorage) {

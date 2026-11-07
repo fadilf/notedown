@@ -17,7 +17,7 @@ class TranscriptionWorker(context: Context, parameters: WorkerParameters) : Coro
         val dependencies = EntryPointAccessors.fromApplication(applicationContext, WorkerDependencies::class.java)
         dependencies.pipeline().run(id, Settings(wav = inputData.getBoolean("wav", false), language = inputData.getString("language").orEmpty(),
             cleanup = inputData.getBoolean("cleanup", false), cleanupModel = inputData.getString("cleanupModel").orEmpty(),
-            prompt = inputData.getString("prompt") ?: DEFAULT_PROMPT))
+            prompt = inputData.getString("prompt") ?: DEFAULT_PROMPT, skipSilence = inputData.getBoolean("skipSilence", false)))
         // API failures are persisted and retried explicitly to avoid unexpected duplicate charges.
         return Result.success()
     }

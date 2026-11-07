@@ -35,6 +35,7 @@ import java.math.BigDecimal
             var language by remember(settings.language) { mutableStateOf(settings.language) }
             OutlinedTextField(language, { language = it.take(2).lowercase(); vm.text("language", language) }, label = { Text("Language (ISO code, blank = auto)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             SettingSwitch("WAV compatibility mode", "Use uncompressed WAV for providers that reject M4A. Also converts saved M4A when retranscribing.", settings.wav) { vm.flag("wav", it) }
+            SettingSwitch("Skip silence before transcription", "Remove long pauses locally from an upload copy. Keeps the original recording. Uploads WAV, which can be larger than M4A.", settings.skipSilence) { vm.flag("skipSilence", it) }
             TextButton(onClick = vm::refresh, enabled = !busy) { Text(if (busy) "Contacting OpenRouter…" else "Refresh available models") }
         } }
         item { SettingsSection("AI cleanup") {
@@ -69,7 +70,12 @@ import java.math.BigDecimal
     if (deleteAll) AlertDialog(onDismissRequest = { deleteAll = false }, title = { Text("Delete all history?") }, text = { Text("All recordings and transcript versions will be permanently removed. The usage ledger is retained.") }, confirmButton = { TextButton(onClick = { deleteAll = false; vm.deleteAll() }) { Text("Delete all") } }, dismissButton = { TextButton(onClick = { deleteAll = false }) { Text("Cancel") } })
 }
 @Composable fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary); content(); HorizontalDivider(Modifier.padding(top = 8.dp)) }
+    PaperCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            content()
+        }
+    }
 }
 @Composable fun SettingSwitch(title: String, subtitle: String, checked: Boolean, change: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

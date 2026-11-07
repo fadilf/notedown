@@ -14,7 +14,7 @@ const val DEFAULT_PROMPT = "Improve punctuation, capitalization and readability 
 private val Context.preferences by preferencesDataStore("settings")
 data class Settings(val model: String = "", val cleanup: Boolean = false, val cleanupModel: String = "", val prompt: String = DEFAULT_PROMPT,
     val language: String = "", val overlay: Boolean = true, val left: Boolean = false, val wav: Boolean = false,
-    val overlayVerticalFraction: Float? = null)
+    val overlayVerticalFraction: Float? = null, val skipSilence: Boolean = false)
 @Singleton class SettingsRepository @Inject constructor(@ApplicationContext context: Context) {
     private val store = context.preferences
     val settings = store.data.catch { if (it is IOException) emit(emptyPreferences()) else throw it }.map { p ->
@@ -22,7 +22,8 @@ data class Settings(val model: String = "", val cleanup: Boolean = false, val cl
             p[stringPreferencesKey("cleanupModel")].orEmpty(), p[stringPreferencesKey("prompt")] ?: DEFAULT_PROMPT,
             p[stringPreferencesKey("language")].orEmpty(), p[booleanPreferencesKey("overlay")] ?: true,
             p[booleanPreferencesKey("left")] ?: false, p[booleanPreferencesKey("wav")] ?: false,
-            p[floatPreferencesKey("overlayVerticalFraction")]?.takeIf { it.isFinite() }?.coerceIn(0f, 1f))
+            p[floatPreferencesKey("overlayVerticalFraction")]?.takeIf { it.isFinite() }?.coerceIn(0f, 1f),
+            p[booleanPreferencesKey("skipSilence")] ?: false)
     }
     suspend fun overlayPosition(left: Boolean, fraction: Float?) {
         store.edit {

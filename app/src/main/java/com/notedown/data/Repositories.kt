@@ -33,7 +33,7 @@ import javax.inject.Singleton
         val id = UUID.randomUUID().toString()
         dao.insert(TranscriptionEntity(id, recordingId, System.currentTimeMillis(), model))
         val data = workDataOf("id" to id, "language" to config.language, "cleanup" to config.cleanup,
-            "wav" to config.wav, "cleanupModel" to config.cleanupModel, "prompt" to config.prompt.take(3000))
+            "wav" to config.wav, "skipSilence" to config.skipSilence, "cleanupModel" to config.cleanupModel, "prompt" to config.prompt.take(3000))
         val request = OneTimeWorkRequestBuilder<TranscriptionWorker>().setId(UUID.fromString(id)).setInputData(data)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).addTag("recording:$recordingId").build()
         // Wait for WorkManager's durable enqueue, not merely its in-memory request construction.

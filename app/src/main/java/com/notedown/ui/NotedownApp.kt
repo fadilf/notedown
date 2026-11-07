@@ -7,6 +7,7 @@ import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,7 +20,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.notedown.R
 import com.notedown.audio.AudioPlaybackManager
@@ -39,23 +43,34 @@ import com.notedown.domain.*
     val player = remember { AudioPlaybackManager(context) }
     DisposableEffect(Unit) { onDispose { player.release() } }
     LaunchedEffect(message) { message?.let { snack.showSnackbar(it); vm.message.value = null } }
-    Scaffold(topBar = { TopAppBar(title = {
+    val navigationColors = NavigationBarItemDefaults.colors(
+        selectedIconColor = MaterialTheme.colorScheme.primary,
+        selectedTextColor = MaterialTheme.colorScheme.onBackground,
+        indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+        unselectedIconColor = MaterialTheme.colorScheme.secondary,
+        unselectedTextColor = MaterialTheme.colorScheme.secondary
+    )
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { TopAppBar(title = {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Image(painterResource(R.drawable.ic_notedown), contentDescription = null, modifier = Modifier.size(36.dp))
-            Text("notedown", style = MaterialTheme.typography.headlineMedium)
+            Image(painterResource(R.drawable.ic_notedown), contentDescription = null, modifier = Modifier.size(40.dp))
+            Text("Note Down", style = MaterialTheme.typography.headlineMedium)
         }
-    },
-        actions = { if (destination == 0) IconButton(onClick = { destination = 1 }) { Icon(Icons.Outlined.Settings, "Settings") } }) },
+    }, expandedHeight = 80.dp, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)) },
         snackbarHost = { SnackbarHost(snack) },
-        bottomBar = { NavigationBar {
-            NavigationBarItem(selected = destination == 0, onClick = { destination = 0 }, icon = { Icon(Icons.Outlined.History, null) }, label = { Text("History") })
-            NavigationBarItem(selected = destination == 1, onClick = { destination = 1 }, icon = { Icon(Icons.Outlined.Tune, null) }, label = { Text("Settings") })
-        } },
+        bottomBar = { Column {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
+            NavigationBarItem(selected = destination == 0, onClick = { destination = 0 }, colors = navigationColors, icon = { Icon(Icons.Outlined.History, null) }, label = { Text("History", fontWeight = if (destination == 0) FontWeight.SemiBold else FontWeight.Normal) })
+            NavigationBarItem(selected = destination == 1, onClick = { destination = 1 }, colors = navigationColors, icon = { Icon(Icons.Outlined.Tune, null) }, label = { Text("Settings", fontWeight = if (destination == 1) FontWeight.SemiBold else FontWeight.Normal) })
+        } } },
         floatingActionButton = { if (destination == 0 && hasKey && settings.model.isNotBlank()) ExtendedFloatingActionButton(
-            onClick = { context.startActivity(Intent(context, CaptureActivity::class.java)) }, icon = { Icon(Icons.Outlined.Mic, null) }, text = { Text("Dictate") }) }
+            onClick = { context.startActivity(Intent(context, CaptureActivity::class.java)) },
+            modifier = Modifier.heightIn(min = 56.dp),
+            containerColor = MaterialTheme.colorScheme.inverseSurface, contentColor = MaterialTheme.colorScheme.inverseOnSurface, shape = RoundedCornerShape(18.dp),
+            icon = { Icon(Icons.Outlined.Mic, null, tint = Color(0xFFF2A33A)) }, text = { Text("Dictate", fontSize = 18.sp, fontWeight = FontWeight.SemiBold) }) }
     ) { padding ->
         if (destination == 1) SettingsScreen(vm, Modifier.padding(padding))
-        else LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 100.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        else LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(18.dp, 12.dp, 18.dp, 100.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item { SetupCard(hasKey, settings.model.isNotBlank(), { destination = 1 }) }
             if (state !is DictationState.Idle) item { Card { Column(Modifier.padding(16.dp)) {
                 Text(when (val s = state) {
@@ -68,8 +83,8 @@ import com.notedown.domain.*
                 if (state is DictationState.Result || state is DictationState.Error) TextButton(onClick = { vm.sessions.dismiss() }) { Text("Dismiss") }
             } } }
             item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("RECORDINGS", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Text("${history.size} saved", style = MaterialTheme.typography.labelLarge)
+                Text("RECORDINGS", style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp), color = MaterialTheme.colorScheme.primary)
+                Text("${history.size} saved", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } }
             if (history.isEmpty()) item { OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Outlined.GraphicEq, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.primary)
