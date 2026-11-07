@@ -7,6 +7,7 @@ Do not treat emulator unit/instrumentation results as proof of Samsung/Gboard co
 | Setup | Fresh install, decline/grant mic, decline notification, enable/disable accessibility | Explanations, no capture before permission, no crash; notification permission optional |
 | IME detection | Open/close keyboard, switch hardware keyboard, split/floating keyboard, rotate, change display size | Mic only with an actual visible IME and non-password editable field; controls remain reachable |
 | Immediate capture | Tap overlay once and speak immediately | Compact activity starts mic automatically, no second tap; expanded recording appears only after start |
+| Return to editor | Leave Accessibility Settings in Notedown's task after setup, switch to an editor, and tap the floating mic | Recording starts after one tap and the original editor returns; Settings is not brought forward |
 | Save/cancel | Stop after several seconds; repeat with Cancel | Stop retains private audio and queues STT; Cancel discards and makes no API request |
 | Modern foreground service | Record on Android 14–16, background app, use notification Stop/Cancel | Visible recording entry activity, microphone FGS indicator and controls; no background-start exceptions |
 | Insertion | Dictate into Gmail, Chrome and a messenger with text/selection before/after cursor | Only captured selection is replaced; surrounding text retained |

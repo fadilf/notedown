@@ -7,7 +7,7 @@
     <uses-feature android:name="android.hardware.microphone" android:required="true" />
     <application android:name=".NotedownApplication" android:label="@string/app_name" android:icon="@drawable/ic_mic" android:theme="@style/Theme.Notedown" android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
-        <activity android:name=".ui.CaptureActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@style/Theme.Notedown.Capture" />
+        <activity android:name=".ui.CaptureActivity" android:exported="false" android:taskAffinity="" android:excludeFromRecents="true" android:theme="@style/Theme.Notedown.Capture" />
         <service android:name=".audio.RecordingService" android:exported="false" android:foregroundServiceType="microphone" />
         <service android:name=".accessibility.NotedownAccessibilityService" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:label="Notedown dictation">
             <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>

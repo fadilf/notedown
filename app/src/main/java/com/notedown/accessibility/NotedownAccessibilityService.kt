@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.notedown.data.*
 import com.notedown.domain.*
 import com.notedown.overlay.OverlayManager
@@ -32,7 +33,7 @@ import javax.inject.Inject
         scope.launch { sessions.state.collectLatest { state ->
             if (state is DictationState.Result && insertedResult !== state) {
                 insertedResult = state
-                val success = insertion.insert(sessions.targetToken, state.text, rootInActiveWindow?.packageName?.toString())
+                val success = insertion.insert(sessions.targetToken, state.text, focusedEditor()?.packageName?.toString())
                 insertion.clear()
                 if (success) { sessions.dismiss() }
             }
@@ -40,11 +41,21 @@ import javax.inject.Inject
         } }
         scope.launch { while (isActive) { delay(700); render() } }
     }
+    private fun focusedEditor(): AccessibilityNodeInfo? {
+        // Touching our overlay can make it the active window. Input focus still belongs
+        // to the application window; never resolve the target from the touched overlay.
+        return windows.asSequence()
+            .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused }
+            .mapNotNull { it.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) }
+            .firstOrNull { it.isEditable && !it.isPassword && it.packageName?.toString() != packageName }
+    }
     private fun begin() {
-        val node = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        val node = focusedEditor()
         sessions.targetToken = insertion.capture(node)
         if (sessions.targetToken == null) return
-        startActivity(Intent(this, CaptureActivity::class.java).putExtra("overlay", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        // Do not bring Notedown's task (possibly still showing permission Settings)
+        // in front of the editor. This short-lived task is removed after mic startup.
+        startActivity(CaptureActivity.overlayIntent(this))
     }
     private fun command(action: String) { startService(Intent(this, RecordingService::class.java).setAction(action)) }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -53,7 +64,7 @@ import javax.inject.Inject
             val pkg = event.packageName?.toString()
             if (sessions.targetToken != null && pkg != packageName && pkg != null &&
                 windows.none { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD && it.root?.packageName?.toString() == pkg }) {
-                insertion.invalidateIfDifferent(rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT))
+                insertion.invalidateIfDifferent(focusedEditor())
             }
         }
         render()
@@ -62,7 +73,7 @@ import javax.inject.Inject
         if (!::overlay.isInitialized) return
         val state = sessions.state.value
         val ime = keyboard.detect(windows)
-        val node = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        val node = focusedEditor()
         val canShowIdle = config.overlay && ime.visible && node?.isEditable == true && !node.isPassword && node.packageName.toString() != packageName
         if (state == DictationState.Idle && !canShowIdle) { overlay.hide(); return }
         if (!config.overlay && state == DictationState.Idle) { overlay.hide(); return }
