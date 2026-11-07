@@ -1,0 +1,1 @@
+<resources><string name="app_name">Notedown</string><string name="accessibility_description">Shows a dictation button when the keyboard is open and inserts your dictated text into the field you selected. Password fields are excluded. Audio and transcripts stay on this device; recordings are sent to OpenRouter only when you stop or retranscribe.</string></resources>

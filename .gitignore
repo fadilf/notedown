@@ -1,0 +1,13 @@
+*.iml
+.gradle/
+.kotlin/
+local.properties
+**/build/
+.idea/
+
+# Local credentials and signing material
+.env
+.env.*
+*.jks
+*.keystore
+key.properties
