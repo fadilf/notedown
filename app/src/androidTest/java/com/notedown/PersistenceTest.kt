@@ -41,6 +41,21 @@ class PersistenceTest {
         assertEquals("chosen/model", second.model); assertTrue(second.cleanup)
         first.text("model", ""); first.flag("cleanup", false)
     }
+    @Test fun overlayPositionPersistsAndCanResetWithoutChangingOtherSettings() = runBlocking {
+        val repository = SettingsRepository(context)
+        val original = repository.settings.first()
+        try {
+            repository.overlayPosition(true, 0.35f)
+            val restored = SettingsRepository(context).settings.first()
+            assertTrue(restored.left)
+            assertEquals(0.35f, restored.overlayVerticalFraction!!, 0.001f)
+            assertEquals(original.model, restored.model)
+            repository.overlayPosition(false, null)
+            val reset = repository.settings.first()
+            assertFalse(reset.left)
+            assertNull(reset.overlayVerticalFraction)
+        } finally { repository.overlayPosition(original.left, original.overlayVerticalFraction) }
+    }
     @Test fun keystoreRoundTripAndRemoval() {
         val keys = ApiKeyStorage(context); keys.write("test-local-credential")
         assertEquals("test-local-credential", ApiKeyStorage(context).read()); keys.remove(); assertNull(keys.read())

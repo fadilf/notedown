@@ -27,7 +27,15 @@ import javax.inject.Inject
     override fun onServiceConnected() {
         overlay = OverlayManager(this, ::begin, { command("stop") }, { command("cancel") }, { id ->
             scope.launch { runCatching { queue.enqueue(id) }; sessions.dismiss() }
-        }, { sessions.dismiss(); render() })
+        }, { sessions.dismiss(); render() }, { left, fraction ->
+            scope.launch {
+                try { settings.overlayPosition(left, fraction) }
+                catch (e: java.io.IOException) {
+                    android.widget.Toast.makeText(this@NotedownAccessibilityService,
+                        "Position moved but could not be saved.", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
         scope.launch { settings.settings.collectLatest { config = it; render() } }
         scope.launch { sessions.state.collectLatest { state ->
             if (state is DictationState.Result && sessions.consumeFocusedInsertionRequest()) {
@@ -68,7 +76,7 @@ import javax.inject.Inject
         if (state == DictationState.Idle && !canShowIdle) { overlay.hide(); return }
         if (!config.overlay && state == DictationState.Idle) { overlay.hide(); return }
         val elapsed = if (state is DictationState.Recording) (System.currentTimeMillis() - state.session.startedAt) / 1000 else 0
-        overlay.show(state, ime.top, config.left, elapsed)
+        overlay.show(state, ime.top, config.left, config.overlayVerticalFraction, elapsed)
     }
     override fun onInterrupt() { if (::overlay.isInitialized) overlay.hide(); sessions.clearFocusedInsertionRequest() }
     override fun onDestroy() { scope.cancel(); if (::overlay.isInitialized) overlay.hide(); sessions.clearFocusedInsertionRequest(); super.onDestroy() }

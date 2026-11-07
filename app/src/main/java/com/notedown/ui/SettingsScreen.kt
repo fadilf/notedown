@@ -48,7 +48,9 @@ import java.math.BigDecimal
         } }
         item { SettingsSection("Floating microphone") {
             SettingSwitch("Show near the keyboard", "Requires Notedown's accessibility service.", settings.overlay) { vm.flag("overlay", it) }
-            SettingSwitch("Position on the left", "Places controls above the keyboard's left edge.", settings.left) { vm.flag("left", it) }
+            SettingSwitch("Position on the left", "Choose which edge the microphone docks to.", settings.left) { vm.flag("left", it) }
+            Text("Drag the floating microphone to move it. It snaps to the nearest side and remembers its position.", style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = vm::resetOverlayPosition) { Text("Reset position above keyboard") }
             Text("Finished dictation is inserted at the cursor in whichever text field is focused when processing completes. If no supported field is focused, use Copy or history.", style = MaterialTheme.typography.bodySmall)
             Text("Android may briefly display the recording panel while enabling microphone access. Capture starts automatically, without another tap.", style = MaterialTheme.typography.bodySmall)
             Text("Recordings stop automatically after 10 minutes. WAV uploads are limited to 25 MB. A failed request keeps the recording for retry.", style = MaterialTheme.typography.bodySmall)
@@ -82,17 +84,8 @@ import java.math.BigDecimal
         Column { Text(label, style = MaterialTheme.typography.labelSmall); Text(models.firstOrNull { it.id == selected }?.name ?: selected.ifBlank { "Choose a model" }) }
     }
     if (selected.isNotBlank() && models.isNotEmpty() && models.none { it.id == selected }) Text("Selected model is unavailable in the current catalog. Choose another before dictating.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-    if (open) AlertDialog(onDismissRequest = { open = false }, title = { Text(label) }, text = { Column {
-        OutlinedTextField(query, { query = it }, label = { Text("Search models") }, singleLine = true)
-        if (models.isEmpty()) Text("Refresh models in Settings. An internet connection is required.")
-        LazyColumn(Modifier.heightIn(max = 380.dp)) { items(models.filter { it.name.contains(query, true) || it.id.contains(query, true) }.size) { index ->
-            val model = models.filter { it.name.contains(query, true) || it.id.contains(query, true) }[index]
-            TextButton(onClick = { change(model.id); open = false }) { Column(Modifier.fillMaxWidth()) {
-                Text(model.name, style = MaterialTheme.typography.titleSmall)
-                Text(model.id, style = MaterialTheme.typography.bodySmall)
-                model.pricing?.let { Text("USD pricing: $it", style = MaterialTheme.typography.labelSmall) }
-                model.architecture?.get("output_modalities")?.let { Text("Output: $it", style = MaterialTheme.typography.labelSmall) }
-            } }
-        } }
-    } }, confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } })
+    if (open) ModelPickerDialog(label, selected, models, query, { query = it }, { open = false }) {
+        change(it)
+        open = false
+    }
 }

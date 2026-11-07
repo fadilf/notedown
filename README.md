@@ -18,7 +18,7 @@ The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Instrumentation te
 1. Open Settings, enter an OpenRouter API key, and validate/save it.
 2. Refresh models and select a transcription model. Discovery uses `output_modalities=transcription`, including specialized STT models.
 3. Grant microphone access and enable **Notedown dictation** in Android's accessibility settings. Notification permission is optional but makes recording controls easier to access.
-4. Focus a normal editable field in another app with its keyboard visible; tap the floating microphone. Stop saves audio and submits it; Cancel discards it without an API request.
+4. Focus a normal editable field in another app with its keyboard visible; tap the floating microphone. Drag it to reposition it; it snaps to the nearest screen edge and remembers its height. Settings lets you change its side or reset it above the keyboard. Stop saves audio and submits it; Cancel discards it without an API request.
 5. Use history for playback, explicit copying, model selection for retranscription, version selection and deletion. The in-app Dictate button also works without accessibility enabled.
 
 Audio and transcripts live in application-private files and Room. The API key is AES-GCM encrypted with an Android Keystore key; backup is disabled. Audio is sent directly to OpenRouter/provider for transcription; enabled cleanup sends raw text separately. Provider data retention policies still apply. Uninstalling deletes local history.

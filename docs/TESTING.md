@@ -6,6 +6,7 @@ Do not treat emulator unit/instrumentation results as proof of Samsung/Gboard co
 |---|---|---|
 | Setup | Fresh install, decline/grant mic, decline notification, enable/disable accessibility | Explanations, no capture before permission, no crash; notification permission optional |
 | IME detection | Open/close keyboard, switch hardware keyboard, split/floating keyboard, rotate, change display size | Mic only with an actual visible IME and non-password editable field; controls remain reachable |
+| Repositioning | Drag the mic to either edge and different heights; close/reopen keyboard, restart service, rotate and change display size; drag recording controls; reset position in Settings | Dragging never triggers a button; side/height persist; controls stay inside system bars and above keyboard; tap still starts capture once; reset returns above keyboard |
 | Immediate capture | Tap overlay once and speak immediately | Compact activity starts mic automatically, no second tap; expanded recording appears only after start |
 | Return to editor | Leave Accessibility Settings in Notedown's task after setup, switch to an editor, and tap the floating mic | Recording starts after one tap and the original editor returns; Settings is not brought forward |
 | Save/cancel | Stop after several seconds; repeat with Cancel | Stop retains private audio and queues STT; Cancel discards and makes no API request |
@@ -15,6 +16,8 @@ Do not treat emulator unit/instrumentation results as proof of Samsung/Gboard co
 | Passwords | Focus password/PIN fields | No capture target or insertion |
 | Network errors | Airplane mode before Stop, invalid key, exhausted credits, rate limit, timeout, unsupported format | Audio retained, actionable status; offline queue resumes; explicit retry creates a version |
 | Models | Refresh catalog, choose unavailable model, retranscribe with another model | Availability warning; no silent model substitution or version overwrite |
+| Model table | Open both model pickers; search, scroll, select a row, and reopen; repeat with large fonts and the keyboard visible | Input/output columns show USD per 1M tokens; selected row is marked; no rounded row clipping; Model, Input, and Output columns are visible together without sideways scrolling, including on narrow screens and with large fonts; missing rates show Unknown; small paid rates remain nonzero; pricing details expose special rates and tiers |
+| Model sorting | Tap each table heading, tap it again, then search and select a model | Model sorts alphabetically; Input/Output sort by exact numeric rate; arrows show ascending/descending order; unknown rates stay last in both directions; all three columns remain visible |
 | Cleanup | Disable, enable, change prompt/model, force cleanup failure | Raw retained; cleanup is separate; failure yields usable raw text |
 | Audio | Play/pause/resume, silence, short clip, headset disconnect, another app takes mic, ten-minute limit | Valid capture/playback or recoverable error; no uncaught exceptions |
 | WAV | Switch compatibility mode; retranscribe existing M4A | WAV conversion uploaded; retained original unchanged |
