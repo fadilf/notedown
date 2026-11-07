@@ -7,6 +7,8 @@ import android.content.Intent
 import android.graphics.Rect
 import android.view.InputDevice
 import android.view.MotionEvent
+import android.view.Gravity
+import android.view.WindowManager
 import com.notedown.data.SettingsRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -19,7 +21,12 @@ import android.view.accessibility.AccessibilityWindowInfo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.runner.lifecycle.ActivityLifecycleCallback
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import com.notedown.audio.RecordingService
+import com.notedown.ui.CaptureActivity
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -58,6 +65,15 @@ class OverlayReturnTest {
         fun overlayButton(description: String): AccessibilityNodeInfo? = automation.windows
             .filter { it.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }
             .firstNotNullOfOrNull { find(it.root, description) }
+        val startupWindow = AtomicReference<WindowManager.LayoutParams>()
+        val captureLifecycle = ActivityLifecycleCallback { activity, stage ->
+            if (activity is CaptureActivity && stage == Stage.RESUMED) {
+                startupWindow.set(WindowManager.LayoutParams().apply { copyFrom(activity.window.attributes) })
+            }
+        }
+        instrumentation.runOnMainSync {
+            ActivityLifecycleMonitorRegistry.getInstance().addLifecycleCallback(captureLifecycle)
+        }
         try {
             automation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
             shell("settings put secure enabled_accessibility_services $services")
@@ -120,19 +136,45 @@ class OverlayReturnTest {
             } catch (e: AssertionError) {
                 throw AssertionError("Expected $movedBounds, restored $restoredBounds; saved left=${savedPosition.left}, fraction=${savedPosition.overlayVerticalFraction}", e)
             }
+            fun editorImeStatus(): AccessibilityNodeInfo? = automation.windows
+                .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.root?.packageName?.toString() == instrumentation.context.packageName }
+                .firstNotNullOfOrNull { find(it.root, "editor-ime-hide-count") }
+            // Ignore the intentional keyboard close/reopen above, then observe
+            // inset transitions in the editor throughout the capture handoff.
+            SystemClock.sleep(500)
+            assertTrue("Observer must detect the intentional keyboard hide above",
+                checkNotNull(editorImeStatus()).text.toString().toInt() > 0)
+            assertTrue(checkNotNull(editorImeStatus()).performAction(AccessibilityNodeInfo.ACTION_CLICK))
             val button = checkNotNull(overlayButton("Start voice dictation"))
             assertTrue("Microphone click should be accepted", button.performAction(AccessibilityNodeInfo.ACTION_CLICK))
             await("recording controls after one microphone tap") { overlayButton("Stop") != null }
+            val startup = checkNotNull(startupWindow.get())
+            val anchor = checkNotNull(restoredBounds)
+            assertEquals("Startup must use a chip instead of the bottom dialog", Gravity.TOP or Gravity.LEFT, startup.gravity)
+            assertTrue("Startup chip must have a compact fixed width", startup.width in 1..(200 * context.resources.displayMetrics.density).toInt())
+            assertEquals("Startup chip must remain at the microphone height", anchor.top, startup.y)
+            assertTrue("Startup chip must stay on-screen", startup.x >= 0 && startup.x + startup.width <= screenWidth)
+            assertEquals("Startup must not dim the editor", 0, startup.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            assertEquals("Startup must not animate a dialog", 0, startup.windowAnimations)
+            assertTrue("Startup must leave input focus with the editor", startup.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE != 0)
             await("original editor restored instead of accessibility settings") {
                 automation.windows.any { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive && it.root?.packageName?.toString() == instrumentation.context.packageName }
             }
             assertTrue("Recording should still be running", overlayButton("Stop") != null)
+            SystemClock.sleep(1000) // Include any delayed hide/show animation after returning.
+            assertTrue("Keyboard should remain visible during recording", automation.windows.any {
+                it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD
+            })
+            assertEquals("Capture must not hide and reopen the editor keyboard", "0", editorImeStatus()?.text?.toString())
             val controls = Rect().also { bounds ->
                 automation.windows.first { it.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }.getBoundsInScreen(bounds)
             }
             assertTrue("Expanded controls should stay on-screen: $controls", controls.left >= 0 && controls.top >= 0 &&
                 controls.right <= screenWidth && controls.bottom <= context.resources.displayMetrics.heightPixels)
         } finally {
+            instrumentation.runOnMainSync {
+                ActivityLifecycleMonitorRegistry.getInstance().removeLifecycleCallback(captureLifecycle)
+            }
             runCatching { context.startService(Intent(context, RecordingService::class.java).setAction("cancel")) }
             if (originalServices.isBlank()) shell("settings delete secure enabled_accessibility_services")
             else shell("settings put secure enabled_accessibility_services $originalServices")

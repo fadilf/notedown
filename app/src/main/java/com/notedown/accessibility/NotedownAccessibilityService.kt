@@ -2,9 +2,9 @@ package com.notedown.accessibility
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.graphics.Rect
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.view.accessibility.AccessibilityWindowInfo
 import com.notedown.data.*
 import com.notedown.domain.*
 import com.notedown.overlay.OverlayManager
@@ -54,16 +54,13 @@ import javax.inject.Inject
     private fun focusedEditor(): AccessibilityNodeInfo? {
         // Touching our overlay can make it the active window. Input focus still belongs
         // to the application window; never resolve the target from the touched overlay.
-        return windows.asSequence()
-            .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused }
-            .mapNotNull { it.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) }
-            .firstOrNull { it.isEditable && !it.isPassword && it.packageName?.toString() != packageName }
+        return FocusedEditorResolver(packageName).resolve(windows)
     }
-    private fun begin() {
+    private fun begin(anchor: Rect) {
         if (focusedEditor() == null) return
         // Do not bring Notedown's task (possibly still showing permission Settings)
         // in front of the editor. This short-lived task is removed after mic startup.
-        startActivity(CaptureActivity.overlayIntent(this))
+        startActivity(CaptureActivity.overlayIntent(this, anchor))
     }
     private fun command(action: String) { startService(Intent(this, RecordingService::class.java).setAction(action)) }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) { render() }

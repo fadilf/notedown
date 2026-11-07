@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,8 +18,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.notedown.R
 import com.notedown.audio.AudioPlaybackManager
 import com.notedown.data.*
 import com.notedown.domain.*
@@ -36,7 +39,12 @@ import com.notedown.domain.*
     val player = remember { AudioPlaybackManager(context) }
     DisposableEffect(Unit) { onDispose { player.release() } }
     LaunchedEffect(message) { message?.let { snack.showSnackbar(it); vm.message.value = null } }
-    Scaffold(topBar = { TopAppBar(title = { Text("notedown", style = MaterialTheme.typography.headlineMedium) },
+    Scaffold(topBar = { TopAppBar(title = {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Image(painterResource(R.drawable.ic_notedown), contentDescription = null, modifier = Modifier.size(36.dp))
+            Text("notedown", style = MaterialTheme.typography.headlineMedium)
+        }
+    },
         actions = { if (destination == 0) IconButton(onClick = { destination = 1 }) { Icon(Icons.Outlined.Settings, "Settings") } }) },
         snackbarHost = { SnackbarHost(snack) },
         bottomBar = { NavigationBar {
@@ -48,8 +56,6 @@ import com.notedown.domain.*
     ) { padding ->
         if (destination == 1) SettingsScreen(vm, Modifier.padding(padding))
         else LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 100.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item { Text("Your voice, written down.", style = MaterialTheme.typography.headlineSmall)
-                Spacer(Modifier.height(6.dp)); Text("A private notebook for everything you say.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             item { SetupCard(hasKey, settings.model.isNotBlank(), { destination = 1 }) }
             if (state !is DictationState.Idle) item { Card { Column(Modifier.padding(16.dp)) {
                 Text(when (val s = state) {
@@ -71,7 +77,7 @@ import com.notedown.domain.*
                 Text("Tap Dictate, or open a keyboard in another app and tap the floating microphone. Your recordings and every transcript version will appear here.")
             } } }
             items(history, key = { it.recording.id }) { item -> RecordingCard(item, settings.model, vm.modelRepository.models.collectAsStateWithLifecycle().value["transcription"].orEmpty(),
-                { player.play(item.recording.filePath) }, { model -> vm.transcribe(item.recording.id, model) }, { player.stop(); vm.delete(item.recording.id) }) }
+                player, { model -> vm.transcribe(item.recording.id, model) }, { if (player.current == item.recording.filePath) player.stop(); vm.delete(item.recording.id) }) }
         }
     }
 }

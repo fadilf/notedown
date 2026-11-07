@@ -1,4 +1,12 @@
 <resources>
 <style name="Theme.Notedown" parent="android:style/Theme.Material.Light.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:windowLightStatusBar">true</item><item name="android:colorAccent">#456454</item></style>
 <style name="Theme.Notedown.Capture" parent="android:style/Theme.Material.Light.Dialog.NoActionBar"><item name="android:windowCloseOnTouchOutside">false</item><item name="android:backgroundDimAmount">0.05</item></style>
+<style name="Theme.Notedown.Capture.Overlay" parent="Theme.Notedown.Capture">
+    <item name="android:backgroundDimEnabled">false</item>
+    <item name="android:windowBackground">@android:color/transparent</item>
+    <item name="android:windowAnimationStyle">@null</item>
+    <item name="android:windowDisablePreview">true</item>
+    <item name="android:windowMinWidthMajor">0dp</item>
+    <item name="android:windowMinWidthMinor">0dp</item>
+</style>
 </resources>

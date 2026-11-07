@@ -3,15 +3,22 @@ package com.notedown.overlay
 import android.accessibilityservice.AccessibilityService
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.res.ColorStateList
 import android.graphics.PixelFormat
 import android.graphics.Color
+import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.view.*
 import android.widget.*
+import com.notedown.R
 import com.notedown.domain.DictationState
 
-class OverlayManager(private val service: AccessibilityService, private val start: () -> Unit, private val stop: () -> Unit,
+class OverlayManager(private val service: AccessibilityService, private val start: (Rect) -> Unit, private val stop: () -> Unit,
     private val cancel: () -> Unit, private val retry: (String) -> Unit, private val dismiss: () -> Unit,
     private val moved: (Boolean, Float) -> Unit) {
+    private val charcoal = service.getColor(R.color.brand_charcoal)
+    private val cream = service.getColor(R.color.brand_cream)
     private val wm = service.getSystemService(WindowManager::class.java)
     private var view: DraggableOverlayLayout? = null
     private var lastRender: String? = null
@@ -23,6 +30,8 @@ class OverlayManager(private val service: AccessibilityService, private val star
     private var dragOrigin: Pair<Int, Int>? = null
     private fun dp(value: Int) = (value * service.resources.displayMetrics.density).toInt()
     fun show(state: DictationState, keyboardTop: Int?, left: Boolean, fraction: Float?, elapsed: Long = 0) {
+        // The visible capture activity owns startup; accessibility overlays sit above it.
+        if (state == DictationState.Starting) { hide(); return }
         // Do not replace a pressed child or reset the window halfway through a gesture.
         if (view?.touching == true) return
         val position = left to fraction
@@ -57,8 +66,6 @@ class OverlayManager(private val service: AccessibilityService, private val star
                 }
             }
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(6), dp(4), dp(6), dp(4))
-            background = android.graphics.drawable.GradientDrawable().apply { setColor(Color.rgb(35, 58, 47)); cornerRadius = dp(28).toFloat() }
             elevation = dp(8).toFloat()
         }.also {
             val p = WindowManager.LayoutParams(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
@@ -66,23 +73,59 @@ class OverlayManager(private val service: AccessibilityService, private val star
                 PixelFormat.TRANSLUCENT).apply { gravity = Gravity.TOP or Gravity.LEFT }
             params = p; wm.addView(it, p); view = it
         }
+        val idle = state == DictationState.Idle
+        layout.alpha = if (idle) 0.75f else 1f
+        layout.setPadding(if (idle) 0 else dp(6), if (idle) 0 else dp(4), if (idle) 0 else dp(6), if (idle) 0 else dp(4))
+        layout.background = if (idle) null else GradientDrawable().apply {
+            setColor(charcoal); cornerRadius = dp(28).toFloat()
+        }
         layout.removeAllViews()
-        fun label(text: String) { layout.addView(TextView(service).apply { this.text = text; setTextColor(Color.WHITE); setPadding(dp(8),0,dp(8),0) }) }
+        fun label(text: String) { layout.addView(TextView(service).apply { this.text = text; setTextColor(cream); setPadding(dp(8),0,dp(8),0) }) }
         fun button(text: String, description: String = text, click: () -> Unit) {
-            layout.addView(Button(service).apply { this.text = text; contentDescription = description; minWidth = dp(48); minimumHeight = dp(48); setOnClickListener { click() } })
+            layout.addView(Button(service).apply {
+                this.text = text; contentDescription = description
+                minWidth = dp(48); minimumHeight = dp(48)
+                backgroundTintList = ColorStateList.valueOf(cream)
+                setTextColor(charcoal)
+                setOnClickListener { click() }
+            })
+        }
+        fun iconButton(icon: Int, description: String, click: () -> Unit) {
+            layout.addView(ImageButton(service).apply {
+                setImageResource(icon)
+                imageTintList = ColorStateList.valueOf(charcoal)
+                setPadding(dp(12), dp(12), dp(12), dp(12))
+                background = RippleDrawable(ColorStateList.valueOf(0x3316181D), GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL; setColor(cream)
+                }, null)
+                contentDescription = description
+                setOnClickListener { click() }
+            }, LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+                marginStart = dp(4); marginEnd = dp(4)
+            })
         }
         when (state) {
             DictationState.Idle -> layout.addView(ImageButton(service).apply {
-                setImageResource(com.notedown.R.drawable.ic_mic)
-                imageTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+                setImageResource(com.notedown.R.drawable.ic_notedown)
+                imageTintList = null
+                setPadding(0, 0, 0, 0)
+                scaleType = ImageView.ScaleType.FIT_CENTER
                 setBackgroundColor(Color.TRANSPARENT)
                 contentDescription = "Start voice dictation"
-                setOnClickListener { start() }
+                setOnClickListener {
+                    val location = IntArray(2)
+                    layout.getLocationOnScreen(location)
+                    start(Rect(location[0], location[1], location[0] + layout.width, location[1] + layout.height))
+                }
             }, LinearLayout.LayoutParams(dp(52), dp(52)))
-            DictationState.Starting -> label("Starting microphone…")
-            is DictationState.Recording -> { label("● ${elapsed / 60}:${(elapsed % 60).toString().padStart(2,'0')}"); button("Stop", click = stop); button("Cancel", click = cancel) }
+            DictationState.Starting -> Unit
+            is DictationState.Recording -> {
+                label("● ${elapsed / 60}:${(elapsed % 60).toString().padStart(2,'0')}")
+                iconButton(R.drawable.ic_check, "Stop", stop)
+                iconButton(R.drawable.ic_close, "Cancel", cancel)
+            }
             DictationState.Saving -> label("Saving…")
-            is DictationState.Processing -> { layout.addView(ProgressBar(service), LinearLayout.LayoutParams(dp(28), dp(28))); label("Transcribing…") }
+            is DictationState.Processing -> { layout.addView(ProgressBar(service).apply { indeterminateTintList = ColorStateList.valueOf(cream) }, LinearLayout.LayoutParams(dp(28), dp(28))); label("Transcribing…") }
             is DictationState.Result -> { label("Saved"); button("Copy") { copy(state.text) }; button("Done", click = dismiss) }
             is DictationState.Error -> { label("Failed"); state.recordingId?.let { id -> button("Retry") { retry(id) } }; button("Details") { service.startActivity(android.content.Intent(service, com.notedown.MainActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }; button("×", "Dismiss", dismiss) }
         }
