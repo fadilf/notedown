@@ -2,60 +2,98 @@
 
 <img src="docs/assets/note-down-icon.svg" alt="Notedown logo" width="96" height="96">
 
-A native Android dictation app built with Kotlin, Compose Material 3, Hilt, Room, DataStore, Retrofit/OkHttp, Media3 and WorkManager. Minimum Android 10 (API 29); targets Android 16 (API 36). Compile SDK 37 is required by the selected stable Compose libraries. There is no backend, account system or subscription.
+**Speak instead of typing on Android.**
 
-## Build and run
+Notedown turns your voice into text. Tap a floating microphone while typing in another app, speak, then stop—the transcription is inserted into the text field you're using.
 
-Open this folder in a current Android Studio, install SDK 37, and use JDK 21 to run the bundled Gradle wrapper (application bytecode targets Java 17). Set `sdk.dir` in your untracked `local.properties` if necessary.
+You can also record inside Notedown and copy the result later. No Notedown account or subscription is required.
+
+## Download
+
+**[Download the latest APK](https://github.com/fadilf/notedown/releases/latest)** from the release's **Assets** section. On your phone, open the APK and allow installation from your browser or file manager when Android asks.
+
+APKs appear here after the first automated release. If no release is available yet, you can [build the app yourself](#development).
+
+## What it does
+
+- Dictate into text fields in other apps.
+- Keep recordings and transcripts so you can listen, copy, or transcribe again.
+- Choose a transcription model through OpenRouter.
+- Optionally clean up the transcript with a separate AI model.
+- View API-reported spending in the usage screen.
+
+## What you need
+
+- Android 10 or newer.
+- An [OpenRouter](https://openrouter.ai/) API key with credits. Transcription and optional cleanup use your OpenRouter balance.
+- Microphone permission. Dictating into other apps also requires enabling Notedown's accessibility service.
+
+## Get started
+
+1. Install and open Notedown.
+2. In **Settings**, enter your OpenRouter API key and validate/save it.
+3. Refresh the model list and choose a transcription model.
+4. Allow microphone access.
+5. To dictate into other apps, enable **Notedown dictation** in Android's accessibility settings.
+
+Notification permission is optional; it makes recording controls easier to access.
+
+## Use it
+
+1. Open a text field in another app so the keyboard appears.
+2. Tap the floating microphone and speak.
+3. Tap **Stop** to save the audio and transcribe it. The result is inserted into the currently focused text field, replacing any selected text.
+
+Drag the microphone to reposition it. Tap **Cancel** to discard a recording without sending it for transcription.
+
+You can also use **Dictate** inside Notedown without enabling accessibility. In-app recordings and history retranscriptions do not insert text automatically. Open history to play recordings, copy text, try another model, switch transcript versions, or delete recordings.
+
+If automatic insertion is unavailable, use **Copy**. Notedown only writes to the clipboard when you explicitly ask it to.
+
+## Privacy and costs
+
+Recordings and transcripts are stored privately on your phone. Audio is sent directly to OpenRouter and the selected provider for transcription. If you enable cleanup, the transcript is sent separately for that step. Provider retention policies apply.
+
+Your API key is encrypted on the device using Android Keystore, and backups are disabled. Uninstalling Notedown deletes local history.
+
+Requests may cost money. The usage screen shows exact API-reported costs and marks missing costs as unavailable. Deleting history does not delete the usage ledger.
+
+## Limits and retries
+
+- Recordings stop automatically after ten minutes. Uploads are limited to 25 MB.
+- Supported audio formats and languages depend on the selected model. WAV compatibility mode is available in Settings.
+- Automatic insertion requires a focused, enabled text field; password fields are excluded.
+- Offline recordings wait for connectivity. Failed API requests require an explicit retry from history: even a timed-out request may already have cost money.
+- Each transcription or retry creates a new version. Queued requests keep the settings they were created with. If cleanup fails, the raw transcript remains usable.
+- Android force-stop pauses background work until you reopen the app. Interrupted audio is recovered when possible, but unfinished recordings may be unplayable.
+
+## Development
+
+Notedown is a native Kotlin app using Jetpack Compose Material 3, Hilt, Room, DataStore, Retrofit/OkHttp, Media3, and WorkManager. It has no backend. Production code is under `app/src/main/java/com/notedown/`.
+
+Open the project in Android Studio. Use **JDK 21** and install **Android SDK 37**. Set `sdk.dir` in an untracked `local.properties` if needed. Application bytecode targets Java 17; minimum Android API is 29 and target API is 36.
 
 ```sh
 ./gradlew :app:assembleDebug
-./gradlew :app:assembleRelease # optimized, unsigned; configure your own release signing
-./gradlew :app:testDebugUnitTest :app:lintDebug
-./gradlew :app:connectedDebugAndroidTest
+./gradlew :app:assembleRelease
 ```
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Instrumentation tests require a running emulator/device; the real microphone test grants microphone permission and records about a second of device audio. Tests use isolated API fakes and never spend OpenRouter credits.
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Local release builds are optimized and unsigned unless you configure signing.
 
-1. Open Settings, enter an OpenRouter API key, and validate/save it.
-2. Refresh models and select a transcription model. Discovery uses `output_modalities=transcription`, including specialized STT models.
-3. Grant microphone access and enable **Notedown dictation** in Android's accessibility settings. Notification permission is optional but makes recording controls easier to access.
-4. Focus a normal editable field in another app with its keyboard visible; tap the floating microphone. Drag it to reposition it; it snaps to the nearest screen edge and remembers its height. Settings lets you change its side or reset it above the keyboard. Stop saves audio and submits it; Cancel discards it without an API request.
-5. Use history for playback, explicit copying, model selection for retranscription, version selection and deletion. The in-app Dictate button also works without accessibility enabled.
+### Automated releases
 
-Audio and transcripts live in application-private files and Room. The API key is AES-GCM encrypted with an Android Keystore key; backup is disabled. Audio is sent directly to OpenRouter/provider for transcription; enabled cleanup sends raw text separately. Provider data retention policies still apply. Uninstalling deletes local history.
+A major/minor version increase on `main`, such as `1.0.2 → 1.1.0`, runs unit tests and lint, builds a signed APK, and publishes it to GitHub Releases. Ordinary pushes and patch-only bumps skip the Android build.
 
-## Implementation
+See **[Release setup](docs/RELEASING.md)** for the required signing secrets and versioning instructions.
 
-- `audio/`: compressed AAC/M4A capture, optional 16 kHz mono WAV capture, temporary M4A-to-WAV conversion, Media3 playback, microphone foreground service with notification Stop/Cancel controls.
-- `domain/`: recording state coordinator, durable transcription worker, raw-first cleanup pipeline. Successful raw responses and their usage are saved transactionally. Cleanup failure leaves raw text usable.
-- `data/`: Room parent recordings and child transcript versions with indexed cascading foreign keys; separate usage ledger; encrypted credentials, DataStore preferences, model cache and interruption recovery.
-- `accessibility/`: actual IME window observation, completion-time text insertion. Editor resolution uses input-focus lookup with a bounded tree-search fallback for custom/virtual editors, including views normally filtered from accessibility retrieval. Only explicitly input-focused, enabled, non-password editors in the focused application window qualify. Overlay dictation inserts once into the currently focused editable field using its latest text and cursor/selection, including when the user switches fields or apps while processing. `ACTION_SET_TEXT` preserves text outside that selection. Password, disabled and unfocused fields are excluded. In-app recordings and history retranscription do not request automatic insertion. There is no automatic clipboard overwrite: the user explicitly taps Copy if insertion is unavailable.
-- `overlay/`: bounded, nonfocusable `TYPE_ACCESSIBILITY_OVERLAY` window with idle, recording, saving, processing and result/error controls. Recording controls remain available if the keyboard closes.
-- `ui/`: Compose history/settings, first-run permission guidance and the recording entry activity. Theme follows light/dark and dynamic colors.
+### Testing
 
-A transcription creates a new version every time. Queued jobs persist their model, language, WAV option, cleanup model and prompt; changing preferences does not alter an existing job. WorkManager waits for connectivity and survives ordinary process death. HTTP errors remain retryable from history. API errors are deliberately **not automatically resubmitted** because a timed-out request may already have incurred cost. There is no upstream idempotency guarantee; process death after an upstream response but before local commit may require a charged retry. Cleanup cancellation propagates normally.
+```sh
+./gradlew :app:testDebugUnitTest :app:lintDebug
+./gradlew :app:connectedDebugAndroidTest
+python3 -B -m unittest discover -s .github/scripts -p 'test_*.py'
+```
 
-## Android microphone constraints
+Device tests require a running emulator or device; audio tests use its microphone. Automated API tests use fakes and do not spend OpenRouter credits. The release workflow runs JVM tests and lint; device and live API checks are separate.
 
-An accessibility overlay is not treated as blanket permission to start background microphone capture. Tapping it launches a compact, user-visible `CaptureActivity`; its resumed lifecycle starts the microphone foreground service automatically. For overlay launches, the activity shows a single charcoal/cream Starting chip at the floating mic's position, without a bottom dialog, screen dimming, or window animation. Capture starts before the expanded recording state is shown, with **no second tap**. Overlay capture uses its own temporary task, separate from Notedown and any permission Settings page left in its back stack. Overlay capture leaves input focus with the original editor so its keyboard can stay open during startup. Once recording starts, that task is removed and the original editor returns to the foreground while the service continues capture. The input target comes from the focused application window, even when touching the overlay makes it the active window. Android's activity/service transition contributes unavoidable startup latency; this implementation does not promise zero milliseconds or bypass permission checks. Permission denial requires the system's permission flow first. No `SYSTEM_ALERT_WINDOW`, battery optimization exemption, storage or contacts permission is requested.
-
-Recordings automatically stop after ten minutes. Multipart uploads are capped at 25 MB; M4A keeps ordinary dictation small, and WAV compatibility mode also converts retained M4A on retranscription. Provider format/language support varies and failures are surfaced with actionable messages. Audio interrupted by process termination is recovered into history when possible; an M4A container killed before finalization can be unplayable. No claim of lossless recovery from force-stop or power loss is made. Android force-stop pauses background jobs until the app is opened again.
-
-The usage screen totals exact decimal API-reported costs, counts successful requests, and labels missing costs as unavailable. It does not invent estimates or treat unknown usage as free. Deleting history retains the usage ledger.
-
-## Verification and remaining device checks
-
-Automated tests cover response/usage parsing, safe API errors, real Android cursor/selection insertion and field switching, one-time overlay delivery, password rejection, cleanup success/failure/cancellation, recording lifecycle guards, real M4A capture and WAV conversion/cancellation, Room relationships/version retention/cascades, settings persistence and Keystore roundtrip. See `docs/TESTING.md` for the required keyboard/OEM matrix and release checks. Live paid OpenRouter requests require your key and have not been exercised by the automated suite.
-
-Verified here: debug and optimized unsigned release builds (release APK approximately 4.1 MB), lint (zero errors; eight nonfatal warnings), 15 unit tests and 13 instrumentation tests on an Android 15 emulator, including automatic activity-to-microphone-service startup. The first-run UI was inspected on the emulator. Public model discovery returned 30 transcription models and 460 text models at verification time; catalogs change. The overlay regression test taps the real microphone over a separate editor with Gboard visible and verifies it returns to that editor even when Accessibility Settings remains in Notedown's task. Physical Samsung/Gboard insertion and paid API calls remain manual checks.
-
-## Authoritative references
-
-Checked during implementation on November 7, 2026:
-
-- [OpenRouter STT documentation](https://github.com/OpenRouterTeam/docs/blob/main/guides/overview/multimodal/stt.mdx): `/audio/transcriptions`, JSON and multipart requests, `output_modalities=transcription`, usage and provider-dependent formats.
-- [OpenRouter chat completions](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request): separate optional text cleanup.
-- [OpenRouter key information](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key): validation using `GET /key`.
-- [Android foreground service restrictions](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start): microphone while-in-use permission and visible-activity startup.
-- [Compose BOM](https://developer.android.com/develop/ui/compose/bom): stable Compose dependency alignment. Dependency versions are pinned in Gradle; there are no dynamic version selectors.
+See **[Device verification](docs/TESTING.md)** for keyboard compatibility, physical-device checks, and live API testing.

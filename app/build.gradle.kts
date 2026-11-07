@@ -8,9 +8,21 @@ plugins {
 android {
     namespace = "com.notedown"
     compileSdk = 37
-    defaultConfig { applicationId = "com.notedown"; minSdk = 29; targetSdk = 36; versionCode = 3; versionName = "1.0.2"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    defaultConfig { applicationId = "com.notedown"; minSdk = 29; targetSdk = 36; versionCode = 4; versionName = "1.1.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    signingConfigs {
+        val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+        if (!keystorePath.isNullOrBlank()) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = requireNotNull(System.getenv("RELEASE_STORE_PASSWORD"))
+                keyAlias = requireNotNull(System.getenv("RELEASE_KEY_ALIAS"))
+                keyPassword = requireNotNull(System.getenv("RELEASE_KEY_PASSWORD"))
+            }
+        }
+    }
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
