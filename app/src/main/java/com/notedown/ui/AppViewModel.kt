@@ -25,6 +25,10 @@ import javax.inject.Inject
     init { viewModelScope.launch { runCatching { recovery.reconcile((sessions.state.value as? DictationState.Recording)?.session?.id) }; hasKey.value = withContext(Dispatchers.IO) { keys.read() != null }; runCatching { modelRepository.refresh() } } }
     fun text(key: String, value: String) { viewModelScope.launch { settingsRepository.text(key, value) } }
     fun flag(key: String, value: Boolean) { viewModelScope.launch { settingsRepository.flag(key, value) } }
+    fun saveProfile(profile: CleanupProfile) { viewModelScope.launch { settingsRepository.saveProfile(profile) } }
+    fun profileShortcut(id: String, value: Boolean) { viewModelScope.launch { settingsRepository.profileShortcut(id, value) } }
+    fun deleteProfile(id: String) { viewModelScope.launch { settingsRepository.deleteProfile(id) } }
+    fun moveProfile(id: String, offset: Int) { viewModelScope.launch { settingsRepository.moveProfile(id, offset) } }
     fun resetOverlayPosition() { viewModelScope.launch { settingsRepository.overlayPosition(settings.value.left, null) } }
     fun key(value: String) { viewModelScope.launch {
         busy.value = true

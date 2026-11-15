@@ -35,6 +35,11 @@ import javax.inject.Inject
                         "Position moved but could not be saved.", android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
+        }, { profile ->
+            startService(Intent(this, RecordingService::class.java).setAction("stop")
+                .putExtra(RecordingService.EXTRA_PROFILE_NAME, profile.name)
+                .putExtra(RecordingService.EXTRA_PROFILE_MODEL, profile.model)
+                .putExtra(RecordingService.EXTRA_PROFILE_PROMPT, profile.prompt))
         })
         scope.launch { settings.settings.collectLatest { config = it; render() } }
         scope.launch { sessions.state.collectLatest { state ->
@@ -73,7 +78,7 @@ import javax.inject.Inject
         if (state == DictationState.Idle && !canShowIdle) { overlay.hide(); return }
         if (!config.overlay && state == DictationState.Idle) { overlay.hide(); return }
         val elapsed = if (state is DictationState.Recording) (System.currentTimeMillis() - state.session.startedAt) / 1000 else 0
-        overlay.show(state, ime.top, config.left, config.overlayVerticalFraction, elapsed)
+        overlay.show(state, ime.top, config.left, config.overlayVerticalFraction, elapsed, config.cleanupProfiles)
     }
     override fun onInterrupt() { if (::overlay.isInitialized) overlay.hide(); sessions.clearFocusedInsertionRequest() }
     override fun onDestroy() { scope.cancel(); if (::overlay.isInitialized) overlay.hide(); sessions.clearFocusedInsertionRequest(); super.onDestroy() }

@@ -32,7 +32,7 @@ sealed interface DictationState {
             mutable.value = DictationState.Recording(recorder.startRecording(settings.settings.first().wav))
         } catch (e: Exception) { pendingInsertion.clear(); mutable.value = DictationState.Error("Microphone unavailable. Check permission and close other recording apps.") }
     }
-    suspend fun stop() {
+    suspend fun stop(profile: CleanupProfile? = null) {
         if (mutable.value !is DictationState.Recording) return
         mutable.value = DictationState.Saving
         var savedId: String? = null
@@ -40,7 +40,7 @@ sealed interface DictationState {
             val recording = recorder.stopRecording()
             history.save(recording)
             savedId = recording.id
-            val id = queue.enqueue(recording.id)
+            val id = queue.enqueue(recording.id, profile = profile)
             mutable.value = DictationState.Processing(id)
             scope.launch {
                 val result = history.transcript(id).filterNotNull().first { it.status in listOf("complete", "failed") }
@@ -48,7 +48,8 @@ sealed interface DictationState {
                 mutable.value = if (result.status == "failed") DictationState.Error(result.errorMessage ?: "Transcription failed", recording.id)
                     else DictationState.Result(result.text, result.errorMessage ?: "Transcript saved")
             }
-        } catch (e: Exception) { pendingInsertion.clear(); mutable.value = DictationState.Error(if (savedId != null) "Recording saved. Select a model and retry from history." else "Could not finish this recording. Try again.", savedId) }
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { pendingInsertion.clear(); mutable.value = DictationState.Error(if (savedId != null) "Recording saved. Select a model and retry from history." else "Could not finish this recording. Try again.", savedId) }
     }
     suspend fun cancel() {
         if (mutable.value !is DictationState.Recording && mutable.value != DictationState.Starting) return

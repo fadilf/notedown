@@ -2,6 +2,8 @@ package com.notedown.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -11,6 +13,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.notedown.api.RouterModel
 import com.notedown.data.*
 import java.math.BigDecimal
+import java.util.UUID
 
 @Composable fun SettingsScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
     val settings by vm.settings.collectAsStateWithLifecycle()
@@ -20,6 +23,7 @@ import java.math.BigDecimal
     val usage by vm.usage.collectAsStateWithLifecycle()
     var key by remember { mutableStateOf("") }
     var deleteAll by remember { mutableStateOf(false) }
+    var editingProfile by remember { mutableStateOf<CleanupProfile?>(null) }
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { Text("Make it yours.", style = MaterialTheme.typography.headlineSmall) }
         item { SettingsSection("OpenRouter") {
@@ -38,14 +42,19 @@ import java.math.BigDecimal
             SettingSwitch("Skip silence before transcription", "Remove long pauses locally from an upload copy. Keeps the original recording. Uploads WAV, which can be larger than M4A.", settings.skipSilence) { vm.flag("skipSilence", it) }
             TextButton(onClick = vm::refresh, enabled = !busy) { Text(if (busy) "Contacting OpenRouter…" else "Refresh available models") }
         } }
-        item { SettingsSection("AI cleanup") {
-            SettingSwitch("Clean up dictated text", "Punctuation and readability, using a separate model.", settings.cleanup) { vm.flag("cleanup", it) }
-            if (settings.cleanup) {
-                ModelPicker("Cleanup model", settings.cleanupModel, models["text"].orEmpty()) { vm.text("cleanupModel", it) }
-                var prompt by remember(settings.prompt) { mutableStateOf(settings.prompt) }
-                OutlinedTextField(prompt, { prompt = it.take(3000); vm.text("prompt", prompt) }, label = { Text("Cleanup system prompt") }, minLines = 4, modifier = Modifier.fillMaxWidth())
-                TextButton(onClick = { vm.text("prompt", DEFAULT_PROMPT) }) { Text("Restore default prompt") }
+        item { SettingsSection("Cleanup profiles") {
+            Text("Tap a profile below the floating recording controls to finish and clean up. The check mark transcribes without cleanup. Other saved profiles are available under More.")
+            settings.cleanupProfiles.forEachIndexed { index, profile ->
+                HorizontalDivider()
+                SettingSwitch(profile.name, "Show below recording controls", profile.shortcut) { vm.profileShortcut(profile.id, it) }
+                if (profile.model.isBlank()) Text("Choose a cleanup model before using this profile.", style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = { editingProfile = profile }) { Text("Edit") }
+                    TextButton(onClick = { vm.moveProfile(profile.id, -1) }, enabled = index > 0) { Text("Up") }
+                    TextButton(onClick = { vm.moveProfile(profile.id, 1) }, enabled = index < settings.cleanupProfiles.lastIndex) { Text("Down") }
+                }
             }
+            OutlinedButton(onClick = { editingProfile = CleanupProfile(UUID.randomUUID().toString(), "") }) { Text("Add profile") }
         } }
         item { SettingsSection("Floating microphone") {
             SettingSwitch("Show near the keyboard", "Requires Notedown's accessibility service.", settings.overlay) { vm.flag("overlay", it) }
@@ -68,6 +77,33 @@ import java.math.BigDecimal
         } }
     }
     if (deleteAll) AlertDialog(onDismissRequest = { deleteAll = false }, title = { Text("Delete all history?") }, text = { Text("All recordings and transcript versions will be permanently removed. The usage ledger is retained.") }, confirmButton = { TextButton(onClick = { deleteAll = false; vm.deleteAll() }) { Text("Delete all") } }, dismissButton = { TextButton(onClick = { deleteAll = false }) { Text("Cancel") } })
+    editingProfile?.let { profile ->
+        CleanupProfileDialog(profile, models["text"].orEmpty(), settings.cleanupProfiles.any { it.id == profile.id },
+            { editingProfile = null }, { vm.saveProfile(it); editingProfile = null },
+            { vm.deleteProfile(profile.id); editingProfile = null })
+    }
+}
+
+@Composable private fun CleanupProfileDialog(profile: CleanupProfile, models: List<RouterModel>, existing: Boolean,
+    dismiss: () -> Unit, save: (CleanupProfile) -> Unit, delete: () -> Unit) {
+    var draft by remember(profile.id) { mutableStateOf(profile) }
+    var deleting by remember { mutableStateOf(false) }
+    AlertDialog(onDismissRequest = dismiss, title = { Text(if (existing) "Edit profile" else "Add profile") }, text = {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedTextField(draft.name, { draft = draft.copy(name = it.take(80)) }, label = { Text("Name") }, singleLine = true)
+            ModelPicker("Cleanup model", draft.model, models) { draft = draft.copy(model = it) }
+            OutlinedTextField(draft.prompt, { draft = draft.copy(prompt = it.take(3000)) }, label = { Text("Cleanup instructions") }, minLines = 4)
+            SettingSwitch("Show shortcut", "Below the floating recording controls", draft.shortcut) { draft = draft.copy(shortcut = it) }
+            if (existing) TextButton(onClick = { deleting = true }) { Text("Delete profile", color = MaterialTheme.colorScheme.error) }
+        }
+    }, confirmButton = {
+        TextButton(onClick = { save(draft.copy(name = draft.name.trim(), prompt = draft.prompt.trim())) },
+            enabled = draft.name.isNotBlank() && draft.prompt.isNotBlank() && draft.model.isNotBlank()) { Text("Save") }
+    }, dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } })
+    if (deleting) AlertDialog(onDismissRequest = { deleting = false }, title = { Text("Delete profile?") },
+        text = { Text("Queued transcriptions keep their saved settings.") },
+        confirmButton = { TextButton(onClick = delete) { Text("Delete") } },
+        dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } })
 }
 @Composable fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     PaperCard(Modifier.fillMaxWidth()) {

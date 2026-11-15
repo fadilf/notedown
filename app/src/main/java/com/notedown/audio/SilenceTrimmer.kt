@@ -59,14 +59,15 @@ class SilenceTrimmer {
 
     companion object {
         const val FRAME_BYTES = 512 * 2 // Silero's 32 ms frames, PCM16.
+        internal const val PADDING_FRAMES = 15
 
         /** Keep 480 ms on each side of every positive frame; merge overlapping padding. */
         internal fun speechRanges(speech: BooleanArray): List<IntRange> {
             val ranges = mutableListOf<IntRange>()
             for (index in speech.indices) {
                 if (!speech[index]) continue
-                val start = (index - 15).coerceAtLeast(0)
-                val end = (index + 15).coerceAtMost(speech.lastIndex)
+                val start = (index - PADDING_FRAMES).coerceAtLeast(0)
+                val end = (index + PADDING_FRAMES).coerceAtMost(speech.lastIndex)
                 val previous = ranges.lastOrNull()
                 if (previous != null && start <= previous.last + 1) {
                     ranges[ranges.lastIndex] = previous.first..end

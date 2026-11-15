@@ -11,3 +11,6 @@ local.properties
 *.jks
 *.keystore
 key.properties
+
+# Private local profiling inputs
+test-recordings/

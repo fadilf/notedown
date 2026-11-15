@@ -39,12 +39,15 @@ class TranscriptionService @Inject constructor(private val api: OpenRouterApi, p
         val converted = if ((settings.wav || settings.skipSilence) && recording.audioFormat != "wav") File.createTempFile("notedown-converted-", ".wav", file.parentFile) else null
         var filtered: File? = null
         try {
-        if (converted != null) com.notedown.audio.WavConverter().convert(file, converted)
+        if (converted != null && !settings.skipSilence) com.notedown.audio.WavConverter().convert(file, converted)
         var upload = converted ?: file
         if (settings.skipSilence) {
             val candidate = File.createTempFile("notedown-converted-trimmed-", ".wav", file.parentFile)
             filtered = candidate
-            val trimmed = try { silenceFilter.trim(upload, candidate) }
+            val trimmed = try {
+                if (converted != null) silenceFilter.convertAndTrim(file, converted, candidate)
+                else silenceFilter.trim(upload, candidate)
+            }
             catch (e: kotlinx.coroutines.CancellationException) { throw e }
             catch (_: Exception) { throw IllegalStateException("Silence removal failed. Retry or turn off Skip silence in Settings.") }
             if (trimmed) upload = candidate else if (!settings.wav) upload = file

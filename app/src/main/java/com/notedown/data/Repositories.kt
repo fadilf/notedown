@@ -5,6 +5,7 @@ import androidx.work.*
 import com.notedown.domain.TranscriptionWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -26,8 +27,9 @@ import javax.inject.Singleton
 }
 @Singleton class TranscriptionRepository @Inject constructor(@ApplicationContext private val context: Context,
     private val dao: HistoryDao, private val settings: SettingsRepository) {
-    suspend fun enqueue(recordingId: String, modelOverride: String? = null): String {
-        val config = settings.settings.first()
+    suspend fun enqueue(recordingId: String, modelOverride: String? = null, profile: CleanupProfile? = null): String {
+        val config = settings.settings.first().withCleanupProfile(profile)
+        require(!config.cleanup || config.cleanupModel.isNotBlank()) { "Select a cleanup model for this profile." }
         val model = modelOverride ?: config.model
         require(model.isNotBlank()) { "Select a transcription model in Settings." }
         val id = UUID.randomUUID().toString()
@@ -39,7 +41,8 @@ import javax.inject.Singleton
         // Wait for WorkManager's durable enqueue, not merely its in-memory request construction.
         try {
             withContext(Dispatchers.IO) { WorkManager.getInstance(context).enqueueUniqueWork(id, ExistingWorkPolicy.KEEP, request).result.get() }
-        } catch (e: Exception) {
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
             dao.transcript(id)?.let { dao.update(it.copy(status = "failed", errorMessage = "Could not schedule transcription. Retry from history.")) }
             throw e
         }

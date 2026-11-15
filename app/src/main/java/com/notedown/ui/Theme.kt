@@ -33,7 +33,7 @@ private val PaperColors = lightColorScheme(
 private val PaperTypography = Typography().let {
     it.copy(
         headlineLarge = it.headlineLarge.copy(fontFamily = FontFamily.Serif),
-        headlineMedium = it.headlineMedium.copy(fontFamily = FontFamily.Serif, fontSize = 28.sp, lineHeight = 34.sp),
+        headlineMedium = it.headlineMedium.copy(fontFamily = FontFamily.Serif, fontSize = 32.sp, lineHeight = 38.sp),
         headlineSmall = it.headlineSmall.copy(fontFamily = FontFamily.Serif),
         titleLarge = it.titleLarge.copy(fontFamily = FontFamily.Serif),
         labelLarge = it.labelLarge.copy(letterSpacing = 0.sp)

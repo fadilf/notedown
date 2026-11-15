@@ -36,10 +36,27 @@ class PersistenceTest {
         try { db.history().insert(TranscriptionEntity("bad", "missing", 1, "a")); fail("Expected foreign key failure") } catch (_: android.database.sqlite.SQLiteConstraintException) { }
     }
     @Test fun settingsPersistAcrossRepositoryInstances() = runBlocking {
-        val first = SettingsRepository(context); first.text("model", "chosen/model"); first.flag("cleanup", true)
-        val second = SettingsRepository(context).settings.first()
-        assertEquals("chosen/model", second.model); assertTrue(second.cleanup)
-        first.text("model", ""); first.flag("cleanup", false)
+        val first = SettingsRepository(context)
+        val original = first.settings.first()
+        val profile = CleanupProfile("persistence-test", "Test profile", "Use short sentences.", "text/model", false)
+        try {
+            first.text("model", "chosen/model")
+            first.saveProfile(profile)
+            val second = SettingsRepository(context).settings.first()
+            assertEquals("chosen/model", second.model)
+            assertEquals(profile, second.cleanupProfiles.single { it.id == profile.id })
+            assertFalse(second.cleanup)
+            first.profileShortcut(profile.id, true)
+            first.moveProfile(profile.id, -1)
+            val changed = first.settings.first().cleanupProfiles
+            assertTrue(changed.single { it.id == profile.id }.shortcut)
+            assertEquals((second.cleanupProfiles.size - 2).coerceAtLeast(0), changed.indexOfFirst { it.id == profile.id })
+            first.deleteProfile(profile.id)
+            assertFalse(first.settings.first().cleanupProfiles.any { it.id == profile.id })
+        } finally {
+            first.deleteProfile(profile.id)
+            first.text("model", original.model)
+        }
     }
     @Test fun overlayPositionPersistsAndCanResetWithoutChangingOtherSettings() = runBlocking {
         val repository = SettingsRepository(context)

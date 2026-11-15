@@ -3,6 +3,8 @@ package com.notedown.overlay
 import android.content.Context
 import android.view.MotionEvent
 import android.view.ViewConfiguration
+import android.view.View
+import android.graphics.Rect
 import android.widget.LinearLayout
 import kotlin.math.hypot
 
@@ -16,8 +18,22 @@ internal class DraggableOverlayLayout(context: Context) : LinearLayout(context) 
     private var downX = 0f
     private var downY = 0f
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
+    var scrollArea: View? = null
+    private var scrolling = false
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            touching = true
+            val bounds = Rect()
+            scrolling = scrollArea?.let { it.getGlobalVisibleRect(bounds) && bounds.contains(event.rawX.toInt(), event.rawY.toInt()) } == true
+        }
+        return try { super.dispatchTouchEvent(event) } finally {
+            if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) touching = false
+        }
+    }
 
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        if (scrolling) return false
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 touching = true

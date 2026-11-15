@@ -13,10 +13,11 @@ import android.view.*
 import android.widget.*
 import com.notedown.R
 import com.notedown.domain.DictationState
+import com.notedown.data.CleanupProfile
 
 class OverlayManager(private val service: AccessibilityService, private val start: (Rect) -> Unit, private val stop: () -> Unit,
     private val cancel: () -> Unit, private val retry: (String) -> Unit, private val dismiss: () -> Unit,
-    private val moved: (Boolean, Float) -> Unit) {
+    private val moved: (Boolean, Float) -> Unit, private val finishWithProfile: (CleanupProfile) -> Unit = {}) {
     private val charcoal = service.getColor(R.color.brand_charcoal)
     private val cream = service.getColor(R.color.brand_cream)
     private val wm = service.getSystemService(WindowManager::class.java)
@@ -28,8 +29,11 @@ class OverlayManager(private val service: AccessibilityService, private val star
     private var lastPosition: Pair<Boolean, Float?>? = null
     private var placement = OverlayPlacement(0, 0, 0, 0)
     private var dragOrigin: Pair<Int, Int>? = null
+    private var timer: TextView? = null
+    private var moreOpen = false
     private fun dp(value: Int) = (value * service.resources.displayMetrics.density).toInt()
-    fun show(state: DictationState, keyboardTop: Int?, left: Boolean, fraction: Float?, elapsed: Long = 0) {
+    fun show(state: DictationState, keyboardTop: Int?, left: Boolean, fraction: Float?, elapsed: Long = 0,
+        profiles: List<CleanupProfile> = emptyList()) {
         // The visible capture activity owns startup; accessibility overlays sit above it.
         if (state == DictationState.Starting) { hide(); return }
         // Do not replace a pressed child or reset the window halfway through a gesture.
@@ -41,7 +45,9 @@ class OverlayManager(private val service: AccessibilityService, private val star
             lastPosition = position
         }
         placement = safePlacement(keyboardTop)
-        val signature = "$state/$placement/$position/$elapsed"
+        timer?.text = "● ${elapsed / 60}:${(elapsed % 60).toString().padStart(2,'0')}"
+        if (state !is DictationState.Recording) moreOpen = false
+        val signature = "$state/$placement/$position/$profiles/$moreOpen"
         if (lastRender == signature && view != null) return
         lastRender = signature
         val layout = view ?: DraggableOverlayLayout(service).apply {
@@ -65,7 +71,7 @@ class OverlayManager(private val service: AccessibilityService, private val star
                     place(this)
                 }
             }
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
             elevation = dp(8).toFloat()
         }.also {
             val p = WindowManager.LayoutParams(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
@@ -80,9 +86,16 @@ class OverlayManager(private val service: AccessibilityService, private val star
             setColor(charcoal); cornerRadius = dp(28).toFloat()
         }
         layout.removeAllViews()
-        fun label(text: String) { layout.addView(TextView(service).apply { this.text = text; setTextColor(cream); setPadding(dp(8),0,dp(8),0) }) }
+        timer = null
+        layout.scrollArea = null
+        val controls = LinearLayout(service).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        layout.addView(controls)
+        fun label(text: String): TextView = TextView(service).apply {
+            this.text = text; setTextColor(cream); setPadding(dp(8),0,dp(8),0)
+            controls.addView(this)
+        }
         fun button(text: String, description: String = text, click: () -> Unit) {
-            layout.addView(Button(service).apply {
+            controls.addView(Button(service).apply {
                 this.text = text; contentDescription = description
                 minWidth = dp(48); minimumHeight = dp(48)
                 backgroundTintList = ColorStateList.valueOf(cream)
@@ -91,7 +104,7 @@ class OverlayManager(private val service: AccessibilityService, private val star
             })
         }
         fun iconButton(icon: Int, description: String, click: () -> Unit) {
-            layout.addView(ImageButton(service).apply {
+            controls.addView(ImageButton(service).apply {
                 setImageResource(icon)
                 imageTintList = ColorStateList.valueOf(charcoal)
                 setPadding(dp(12), dp(12), dp(12), dp(12))
@@ -105,7 +118,7 @@ class OverlayManager(private val service: AccessibilityService, private val star
             })
         }
         when (state) {
-            DictationState.Idle -> layout.addView(ImageButton(service).apply {
+            DictationState.Idle -> controls.addView(ImageButton(service).apply {
                 setImageResource(com.notedown.R.drawable.ic_notedown)
                 imageTintList = null
                 setPadding(0, 0, 0, 0)
@@ -120,12 +133,45 @@ class OverlayManager(private val service: AccessibilityService, private val star
             }, LinearLayout.LayoutParams(dp(52), dp(52)))
             DictationState.Starting -> Unit
             is DictationState.Recording -> {
-                label("● ${elapsed / 60}:${(elapsed % 60).toString().padStart(2,'0')}")
-                iconButton(R.drawable.ic_check, "Stop", stop)
+                timer = label("● ${elapsed / 60}:${(elapsed % 60).toString().padStart(2,'0')}")
+                iconButton(R.drawable.ic_check, "Stop without cleanup", stop)
                 iconButton(R.drawable.ic_close, "Cancel", cancel)
+                val shortcuts = profiles.filter { it.shortcut }
+                val others = profiles.filterNot { it.shortcut }
+                if (shortcuts.isNotEmpty() || others.isNotEmpty()) {
+                    val scroll = ScrollView(service)
+                    val choices = LinearLayout(service).apply { orientation = LinearLayout.VERTICAL }
+                    scroll.addView(choices)
+                    fun choice(text: String, description: String = text, click: () -> Unit) {
+                        choices.addView(Button(service).apply {
+                            this.text = text
+                            contentDescription = description
+                            minimumHeight = dp(48)
+                            maxLines = 2
+                            backgroundTintList = ColorStateList.valueOf(cream)
+                            setTextColor(charcoal)
+                            setOnClickListener { click() }
+                        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+                    }
+                    (if (moreOpen) others else shortcuts).forEach { profile ->
+                        choice(profile.name, "Stop and apply ${profile.name}") {
+                            if (profile.model.isBlank()) Toast.makeText(service, "Choose a cleanup model for ${profile.name} in Settings.", Toast.LENGTH_LONG).show()
+                            else finishWithProfile(profile)
+                        }
+                    }
+                    if (others.isNotEmpty()) choice(if (moreOpen) "Back to shortcuts" else "More…") {
+                        moreOpen = !moreOpen
+                        layout.post { show(state, keyboardTop, left, fraction, elapsed, profiles) }
+                    }
+                    val available = (placement.bottom - placement.top - dp(64)).coerceAtLeast(0)
+                    val rows = (if (moreOpen) others.size else shortcuts.size) + if (others.isNotEmpty()) 1 else 0
+                    layout.addView(scroll, LinearLayout.LayoutParams(dp(220).coerceAtMost((placement.right - placement.left).coerceAtLeast(1)),
+                        minOf(dp(240), available, dp(64) * rows)))
+                    layout.scrollArea = scroll
+                }
             }
             DictationState.Saving -> label("Saving…")
-            is DictationState.Processing -> { layout.addView(ProgressBar(service).apply { indeterminateTintList = ColorStateList.valueOf(cream) }, LinearLayout.LayoutParams(dp(28), dp(28))); label("Transcribing…") }
+            is DictationState.Processing -> { controls.addView(ProgressBar(service).apply { indeterminateTintList = ColorStateList.valueOf(cream) }, LinearLayout.LayoutParams(dp(28), dp(28))); label("Transcribing…") }
             is DictationState.Result -> { label("Saved"); button("Copy") { copy(state.text) }; button("Done", click = dismiss) }
             is DictationState.Error -> { label("Failed"); state.recordingId?.let { id -> button("Retry") { retry(id) } }; button("Details") { service.startActivity(android.content.Intent(service, com.notedown.MainActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }; button("×", "Dismiss", dismiss) }
         }
@@ -164,5 +210,5 @@ class OverlayManager(private val service: AccessibilityService, private val star
         })
         Toast.makeText(service, "Transcript copied", Toast.LENGTH_SHORT).show()
     }
-    fun hide() { view?.let { wm.removeView(it) }; view = null; params = null; dragOrigin = null; lastRender = null }
+    fun hide() { view?.let { wm.removeView(it) }; view = null; params = null; dragOrigin = null; lastRender = null; timer = null; moreOpen = false }
 }

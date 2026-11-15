@@ -10,6 +10,7 @@ import android.view.MotionEvent
 import android.view.Gravity
 import android.view.WindowManager
 import com.notedown.data.SettingsRepository
+import com.notedown.data.CleanupProfile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -75,6 +76,10 @@ class OverlayReturnTest {
             ActivityLifecycleMonitorRegistry.getInstance().addLifecycleCallback(captureLifecycle)
         }
         try {
+            runBlocking {
+                repository.saveProfile(CleanupProfile("overlay-shortcut-test", "Shortcut test"))
+                repository.saveProfile(CleanupProfile("overlay-more-test", "More test", shortcut = false))
+            }
             automation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
             shell("settings put secure enabled_accessibility_services $services")
             shell("settings put secure accessibility_enabled 1")
@@ -116,7 +121,7 @@ class OverlayReturnTest {
                 }
             }
             assertNotNull(savedPosition.overlayVerticalFraction)
-            assertNull("Dragging must not start recording", overlayButton("Stop"))
+            assertNull("Dragging must not start recording", overlayButton("Stop without cleanup"))
             SystemClock.sleep(500) // Wait for the edge snap to reach WindowManager/accessibility.
             val movedBounds = Rect().also { checkNotNull(overlayButton("Start voice dictation")).getBoundsInScreen(it) }
             // Hide and recreate the overlay by closing/reopening the IME.
@@ -147,7 +152,7 @@ class OverlayReturnTest {
             assertTrue(checkNotNull(editorImeStatus()).performAction(AccessibilityNodeInfo.ACTION_CLICK))
             val button = checkNotNull(overlayButton("Start voice dictation"))
             assertTrue("Microphone click should be accepted", button.performAction(AccessibilityNodeInfo.ACTION_CLICK))
-            await("recording controls after one microphone tap") { overlayButton("Stop") != null }
+            await("recording controls after one microphone tap") { overlayButton("Stop without cleanup") != null }
             val startup = checkNotNull(startupWindow.get())
             val anchor = checkNotNull(restoredBounds)
             assertEquals("Startup must use a chip instead of the bottom dialog", Gravity.TOP or Gravity.LEFT, startup.gravity)
@@ -160,7 +165,19 @@ class OverlayReturnTest {
             await("original editor restored instead of accessibility settings") {
                 automation.windows.any { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive && it.root?.packageName?.toString() == instrumentation.context.packageName }
             }
-            assertTrue("Recording should still be running", overlayButton("Stop") != null)
+            assertTrue("Recording should still be running", overlayButton("Stop without cleanup") != null)
+            assertNotNull(overlayButton("Stop and apply Shortcut test"))
+            assertNull(overlayButton("Stop and apply More test"))
+            assertTrue(checkNotNull(overlayButton("More…")).performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            await("other profiles in More") { overlayButton("Stop and apply More test") != null }
+            assertNotNull("Opening More must not stop recording", overlayButton("Stop without cleanup"))
+            assertTrue("More keeps editor input focus", automation.windows.any {
+                it.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
+                    it.root?.packageName?.toString() == instrumentation.context.packageName &&
+                    it.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.isEditable == true
+            })
+            assertTrue(checkNotNull(overlayButton("Back to shortcuts")).performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            await("shortcut profiles restored") { overlayButton("Stop and apply Shortcut test") != null }
             SystemClock.sleep(1000) // Include any delayed hide/show animation after returning.
             assertTrue("Keyboard should remain visible during recording", automation.windows.any {
                 it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD
@@ -179,7 +196,11 @@ class OverlayReturnTest {
             if (originalServices.isBlank()) shell("settings delete secure enabled_accessibility_services")
             else shell("settings put secure enabled_accessibility_services $originalServices")
             shell("settings put secure accessibility_enabled ${if (originallyEnabled == "1") "1" else "0"}")
-            runBlocking { repository.overlayPosition(originalPosition.left, originalPosition.overlayVerticalFraction) }
+            runBlocking {
+                repository.deleteProfile("overlay-shortcut-test")
+                repository.deleteProfile("overlay-more-test")
+                repository.overlayPosition(originalPosition.left, originalPosition.overlayVerticalFraction)
+            }
             scenario.close()
         }
     }

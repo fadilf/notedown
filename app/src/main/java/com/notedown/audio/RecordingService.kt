@@ -7,19 +7,34 @@ import android.os.*
 import com.notedown.R
 import com.notedown.MainActivity
 import com.notedown.domain.*
+import com.notedown.data.CleanupProfile
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import javax.inject.Inject
 
 @AndroidEntryPoint class RecordingService : Service() {
-    companion object { const val EXTRA_INSERT_INTO_FOCUSED_FIELD = "insertIntoFocusedField" }
+    companion object {
+        const val EXTRA_INSERT_INTO_FOCUSED_FIELD = "insertIntoFocusedField"
+        const val EXTRA_PROFILE_NAME = "profileName"
+        const val EXTRA_PROFILE_MODEL = "profileModel"
+        const val EXTRA_PROFILE_PROMPT = "profilePrompt"
+    }
     @Inject lateinit var sessions: RecordingSessionManager
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var limit: Job? = null
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            "stop" -> scope.launch { limit?.cancel(); sessions.stop(); stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
+            "stop" -> {
+                val profile = intent.getStringExtra(EXTRA_PROFILE_MODEL)?.let { model ->
+                    CleanupProfile("selected", intent.getStringExtra(EXTRA_PROFILE_NAME).orEmpty(),
+                        intent.getStringExtra(EXTRA_PROFILE_PROMPT).orEmpty(), model)
+                }
+                // A second tap must not stop this service while the first finish is saving audio.
+                if (sessions.state.value is DictationState.Recording) {
+                    scope.launch { limit?.cancel(); sessions.stop(profile); stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
+                }
+            }
             "cancel" -> scope.launch { limit?.cancel(); sessions.cancel(); stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
             else -> {
                 try {

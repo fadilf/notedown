@@ -15,7 +15,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,7 +60,7 @@ fun copyTranscript(context: android.content.Context, text: String) {
                 }
             }
             if (text.isNotBlank()) {
-                SelectionContainer { Text(text, maxLines = if (expanded) Int.MAX_VALUE else 5, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Serif, fontSize = 19.sp, lineHeight = 27.sp)) }
+                SelectionContainer { Text(text, maxLines = if (expanded) Int.MAX_VALUE else 5, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, lineHeight = 26.sp, letterSpacing = 0.sp)) }
                 if (text.length > 200 || text.count { it == '\n' } > 4) TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Show less" else "Read more") }
                 if (transcript?.cleanedText != null) TextButton(onClick = { showRaw = !showRaw }) { Text(if (showRaw) "Show cleaned text" else "Show original transcript") }
             } else Text(if (transcript?.status in listOf("queued", "processing")) "Queued or transcribing…" else "Audio saved on this device.", color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -18,9 +18,9 @@ APKs appear here after the first automated release. If no release is available y
 
 - Dictate into text fields in other apps.
 - Keep recordings and transcripts so you can listen, copy, or transcribe again.
-- Browse white paper-style recording cards on a warm cream background, with dark brown serif transcripts and amber accents. This paper theme stays consistent even when Android uses dark mode. Settings is available in the bottom navigation.
+- Browse white paper-style recording cards on a warm cream background, with readable sans-serif transcripts, a bold serif wordmark, and amber accents. This paper theme stays consistent even when Android uses dark mode. The bottom bar centers a raised circular Dictate button between History and Settings; before a key and model are configured, it opens Settings.
 - Choose a transcription model through OpenRouter.
-- Optionally clean up the transcript with a separate AI model.
+- Finish floating dictation with a named cleanup profile: General cleanup, List, Checklist, or your own custom formatting instructions and model.
 - Optionally skip long silences locally before transcription, keeping the original recording.
 - View API-reported spending in the usage screen.
 
@@ -44,9 +44,13 @@ Notification permission is optional; it makes recording controls easier to acces
 
 1. Open a text field in another app so the keyboard appears.
 2. Tap the floating microphone and speak.
-3. Tap **Stop** to save the audio and transcribe it. The result is inserted into the currently focused text field, replacing any selected text.
+3. Tap the **check mark** to save and transcribe without cleanup, or tap a **cleanup profile** below the controls to stop and apply its formatting. The result is inserted into the currently focused text field, replacing any selected text.
 
 Drag the microphone to reposition it. Tap **Cancel** to discard a recording without sending it for transcription.
+
+Manage **Cleanup profiles** in Settings. General cleanup, List, and Checklist are provided to start; each has an editable name, prompt, and cleanup model. Choose a model before using a profile. Add as many profiles as you need, reorder them, and enable **Show below recording controls** for direct shortcuts. Other saved profiles appear under **More…** in the floating widget; opening More keeps recording until you choose a profile. Long shortcut lists scroll above the keyboard. On upgrade, General cleanup retains your existing cleanup model, custom prompt, and enabled preference.
+
+Cleanup is chosen per recording. Notification Stop, the ten-minute limit, in-app recording, and history retranscription produce transcription without cleanup. Cleanup failure leaves the raw transcript usable, and queued work retains the chosen profile's model and prompt even if you edit or delete that profile later.
 
 You can also use **Dictate** inside Notedown without enabling accessibility. In-app recordings and history retranscriptions do not insert text automatically. Open history to play recordings, copy text, try another model, switch transcript versions, or delete recordings.
 
@@ -69,6 +73,8 @@ Requests may cost money. The usage screen shows exact API-reported costs and mar
 - Each transcription or retry creates a new version. Queued requests keep the settings they were created with. If cleanup fails, the raw transcript remains usable.
 - **Skip silence before transcription** is off by default in Settings. It uses bundled, on-device Silero speech detection to shorten an upload copy, retaining about half a second around detected speech. Original recordings and playback remain unchanged. Shortened uploads use WAV and may be larger than compressed M4A; cost savings depend on provider billing. If no speech is detected or nothing can be removed, the original upload path is used to avoid discarding quiet speech. Detection errors stop before the API request; retry explicitly or disable the option. Queued work keeps its saved silence-removal preference.
 - Android force-stop pauses background work until you reopen the app. Interrupted audio is recovered when possible, but unfinished recordings may be unplayable.
+
+For compressed recordings with silence removal enabled, decoding and speech detection run concurrently during upload preparation, using a bounded chunk queue and a short speech-padding buffer. This preserves the same speech decisions and padding as the WAV path.
 
 ## Development
 

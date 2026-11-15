@@ -7,7 +7,6 @@ import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,48 +41,40 @@ import com.notedown.domain.*
     val player = remember { AudioPlaybackManager(context) }
     DisposableEffect(Unit) { onDispose { player.release() } }
     LaunchedEffect(message) { message?.let { snack.showSnackbar(it); vm.message.value = null } }
-    val navigationColors = NavigationBarItemDefaults.colors(
-        selectedIconColor = MaterialTheme.colorScheme.primary,
-        selectedTextColor = MaterialTheme.colorScheme.onBackground,
-        indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-        unselectedIconColor = MaterialTheme.colorScheme.secondary,
-        unselectedTextColor = MaterialTheme.colorScheme.secondary
-    )
     Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { TopAppBar(title = {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Image(painterResource(R.drawable.ic_notedown), contentDescription = null, modifier = Modifier.size(40.dp))
-            Text("Note Down", style = MaterialTheme.typography.headlineMedium)
+            Text("notedown", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         }
     }, expandedHeight = 80.dp, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)) },
         snackbarHost = { SnackbarHost(snack) },
-        bottomBar = { Column {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
-            NavigationBarItem(selected = destination == 0, onClick = { destination = 0 }, colors = navigationColors, icon = { Icon(Icons.Outlined.History, null) }, label = { Text("History", fontWeight = if (destination == 0) FontWeight.SemiBold else FontWeight.Normal) })
-            NavigationBarItem(selected = destination == 1, onClick = { destination = 1 }, colors = navigationColors, icon = { Icon(Icons.Outlined.Tune, null) }, label = { Text("Settings", fontWeight = if (destination == 1) FontWeight.SemiBold else FontWeight.Normal) })
-        } } },
-        floatingActionButton = { if (destination == 0 && hasKey && settings.model.isNotBlank()) ExtendedFloatingActionButton(
-            onClick = { context.startActivity(Intent(context, CaptureActivity::class.java)) },
-            modifier = Modifier.heightIn(min = 56.dp),
-            containerColor = MaterialTheme.colorScheme.inverseSurface, contentColor = MaterialTheme.colorScheme.inverseOnSurface, shape = RoundedCornerShape(18.dp),
-            icon = { Icon(Icons.Outlined.Mic, null, tint = Color(0xFFF2A33A)) }, text = { Text("Dictate", fontSize = 18.sp, fontWeight = FontWeight.SemiBold) }) }
+        bottomBar = {
+            DictationNavigationBar(destination, { destination = it }) {
+                if (hasKey && settings.model.isNotBlank()) {
+                    context.startActivity(Intent(context, CaptureActivity::class.java))
+                } else destination = 1
+            }
+        }
     ) { padding ->
-        if (destination == 1) SettingsScreen(vm, Modifier.padding(padding))
-        else LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(18.dp, 12.dp, 18.dp, 100.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item { SetupCard(hasKey, settings.model.isNotBlank(), { destination = 1 }) }
-            if (state !is DictationState.Idle) item { Card { Column(Modifier.padding(16.dp)) {
-                Text(when (val s = state) {
-                    is DictationState.Recording -> "Recording… Use the floating controls or notification to stop."
-                    is DictationState.Processing -> "Waiting for network or transcribing. You can leave the app."
-                    is DictationState.Result -> s.message
-                    is DictationState.Error -> s.message
-                    else -> "Preparing your recording…"
-                })
-                if (state is DictationState.Result || state is DictationState.Error) TextButton(onClick = { vm.sessions.dismiss() }) { Text("Dismiss") }
-            } } }
-            item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("RECORDINGS", style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp), color = MaterialTheme.colorScheme.primary)
-                Text("${history.size} saved", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val contentPadding = dictationContentPadding(padding)
+        if (destination == 1) SettingsScreen(vm, Modifier.padding(contentPadding))
+        else LazyColumn(Modifier.fillMaxSize().padding(contentPadding), contentPadding = PaddingValues(18.dp, 12.dp, 18.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            item { Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                SetupCard(hasKey, settings.model.isNotBlank(), { destination = 1 })
+                if (state !is DictationState.Idle) Card { Column(Modifier.padding(16.dp)) {
+                    Text(when (val s = state) {
+                        is DictationState.Recording -> "Recording… Use the floating controls or notification to stop."
+                        is DictationState.Processing -> "Waiting for network or transcribing. You can leave the app."
+                        is DictationState.Result -> s.message
+                        is DictationState.Error -> s.message
+                        else -> "Preparing your recording…"
+                    })
+                    if (state is DictationState.Result || state is DictationState.Error) TextButton(onClick = { vm.sessions.dismiss() }) { Text("Dismiss") }
+                } }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("RECORDINGS", style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp), color = MaterialTheme.colorScheme.primary)
+                    Text("${history.size} saved", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             } }
             if (history.isEmpty()) item { OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Outlined.GraphicEq, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.primary)
