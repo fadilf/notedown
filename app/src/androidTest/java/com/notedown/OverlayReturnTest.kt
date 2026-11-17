@@ -169,6 +169,17 @@ class OverlayReturnTest {
             assertTrue("Recording should still be running", overlayButton("Stop without cleanup") != null)
             assertNotNull(overlayButton("Stop and apply Shortcut test"))
             val recordingPill = Rect().also { checkNotNull(overlayButton("Recording controls")).getBoundsInScreen(it) }
+            val cancelPill = Rect().also { checkNotNull(overlayButton("Cancel")).getBoundsInScreen(it) }
+            val timePill = Rect().also { checkNotNull(overlayButton("Elapsed recording time")).getBoundsInScreen(it) }
+            val finishPill = Rect().also { checkNotNull(overlayButton("Stop without cleanup")).getBoundsInScreen(it) }
+            assertTrue("Cancel, time and finish have separate gaps", cancelPill.right < timePill.left && timePill.right < finishPill.left)
+            assertEquals(cancelPill.top, timePill.top)
+            assertEquals(timePill.top, finishPill.top)
+            assertEquals(cancelPill.height(), timePill.height())
+            assertEquals(timePill.height(), finishPill.height())
+            assertTrue("Center time pill is wider than the icon buttons", timePill.width() > cancelPill.width())
+            assertEquals(recordingPill.left, cancelPill.left)
+            assertEquals(recordingPill.right, finishPill.right)
             val profilePill = Rect().also { checkNotNull(overlayButton("Stop and apply Shortcut test")).getBoundsInScreen(it) }
             assertEquals("Profile pill matches control pill width", recordingPill.width(), profilePill.width())
             assertEquals("Profile pill matches control pill height", recordingPill.height(), profilePill.height())

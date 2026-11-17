@@ -46,11 +46,13 @@ Notification permission is optional; it makes recording controls easier to acces
 2. Tap the floating microphone and speak.
 3. Tap the **check mark** to save and transcribe without cleanup, or tap a **cleanup profile** below the controls to stop and apply its formatting. The result is inserted into the currently focused text field, replacing any selected text.
 
-Drag the microphone to reposition it. Tap **Cancel** to discard a recording without sending it for transcription.
+Drag the microphone to reposition it. While recording, the top row has three separate cream controls with dark text/icons: **Cancel** on the left, a wider elapsed-time pill in the center, and the **check mark** on the right, with transparent gaps between them. Drag the time pill to move the controls. Tap **Cancel** to discard a recording without sending it for transcription.
 
-Manage **Cleanup profiles** in Settings. General cleanup, List, and Checklist are provided to start; each has an editable name, prompt, and cleanup model. Choose a model before using a profile. Add as many profiles as you need, reorder them, and enable **Show below recording controls** for direct shortcuts. Shortcuts are separate pills stacked below the recording pill, matching its width and height with transparent gaps between them. Other saved profiles appear under **More…** in the floating widget; opening More keeps recording until you choose a profile. Long shortcut lists scroll above the keyboard. On upgrade, General cleanup retains your existing cleanup model, custom prompt, and enabled preference.
+Manage **Cleanup profiles** in Settings. General cleanup, List, and Checklist are provided to start; each has an editable name, prompt, and cleanup model. Choose a model before using a profile. Add as many profiles as you need, reorder them, and enable **Show below recording controls** for direct shortcuts. Shortcuts are separate pills stacked below the recording controls, matching the full top row's width and height with transparent gaps between them. Other saved profiles appear under **More…** in the floating widget; opening More keeps recording until you choose a profile. Long shortcut lists scroll above the keyboard. On upgrade, General cleanup retains your existing cleanup model, custom prompt, and enabled preference.
 
 The starter Checklist profile requests Markdown task items (`- [ ] Task`), one per line. Updates correct its original bare-checkbox prompt automatically if those instructions have not been customized.
+
+In the profile list, drag the handle on the left up or down to change the order; the list scrolls when you drag near the screen edges. Drop to save the new order. The pencil immediately to the left of each enable switch opens the profile editor. Accessibility actions on the drag handle also support moving a profile up or down.
 
 Cleanup is chosen per recording. Notification Stop, the ten-minute limit, in-app recording, and history retranscription produce transcription without cleanup. Cleanup failure leaves the raw transcript usable, and queued work retains the chosen profile's model and prompt even if you edit or delete that profile later.
 

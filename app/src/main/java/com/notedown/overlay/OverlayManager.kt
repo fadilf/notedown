@@ -90,7 +90,9 @@ class OverlayManager(private val service: AccessibilityService, private val star
         val controls = LinearLayout(service).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            if (!idle) {
+            clipChildren = false
+            clipToPadding = false
+            if (!idle && state !is DictationState.Recording) {
                 setPadding(dp(6), dp(4), dp(6), dp(4))
                 background = GradientDrawable().apply { setColor(charcoal); cornerRadius = dp(28).toFloat() }
                 elevation = dp(8).toFloat()
@@ -119,10 +121,9 @@ class OverlayManager(private val service: AccessibilityService, private val star
                     shape = GradientDrawable.OVAL; setColor(cream)
                 }, null)
                 contentDescription = description
+                elevation = dp(8).toFloat()
                 setOnClickListener { click() }
-            }, LinearLayout.LayoutParams(dp(48), dp(48)).apply {
-                marginStart = dp(4); marginEnd = dp(4)
-            })
+            }, LinearLayout.LayoutParams(dp(48), dp(48)))
         }
         when (state) {
             DictationState.Idle -> controls.addView(ImageButton(service).apply {
@@ -141,10 +142,25 @@ class OverlayManager(private val service: AccessibilityService, private val star
             DictationState.Starting -> Unit
             is DictationState.Recording -> {
                 controls.contentDescription = "Recording controls"
-                timer = label("● ${elapsed / 60}:${(elapsed % 60).toString().padStart(2,'0')}")
-                iconButton(R.drawable.ic_check, "Stop without cleanup", stop)
                 iconButton(R.drawable.ic_close, "Cancel", cancel)
-                // Size every detached profile pill from the recording pill, including its padding.
+                timer = TextView(service).apply {
+                    text = "● ${elapsed / 60}:${(elapsed % 60).toString().padStart(2,'0')}"
+                    contentDescription = "Elapsed recording time"
+                    setTextColor(charcoal)
+                    textSize = 16f
+                    gravity = Gravity.CENTER
+                    setSingleLine()
+                    setPadding(dp(16), 0, dp(16), 0)
+                    // Keep the row stable as the timer grows to the ten-minute limit.
+                    minimumWidth = maxOf(dp(88), kotlin.math.ceil(paint.measureText("● 10:00")).toInt() + dp(32))
+                    background = GradientDrawable().apply { setColor(cream); cornerRadius = dp(24).toFloat() }
+                    elevation = dp(8).toFloat()
+                    controls.addView(this, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(48)).apply {
+                        marginStart = dp(8); marginEnd = dp(8)
+                    })
+                }
+                iconButton(R.drawable.ic_check, "Stop without cleanup", stop)
+                // Profile pills match the full three-control row's width and height.
                 controls.measure(View.MeasureSpec.makeMeasureSpec((placement.right - placement.left).coerceAtLeast(1), View.MeasureSpec.AT_MOST),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
                 val pillWidth = controls.measuredWidth

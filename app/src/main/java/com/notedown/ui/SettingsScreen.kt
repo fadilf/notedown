@@ -2,11 +2,17 @@ package com.notedown.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,7 +30,24 @@ import java.util.UUID
     var key by remember { mutableStateOf("") }
     var deleteAll by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf<CleanupProfile?>(null) }
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    val listState = rememberLazyListState()
+    var dragY by remember { mutableStateOf<Float?>(null) }
+    var viewport by remember { mutableStateOf(Rect.Zero) }
+    val edge = with(LocalDensity.current) { 64.dp.toPx() }
+    LaunchedEffect(dragY != null) {
+        while (dragY != null) {
+            withFrameNanos { }
+            val y = dragY ?: break
+            val distance = when {
+                y < viewport.top + edge -> y - viewport.top - edge
+                y > viewport.bottom - edge -> y - viewport.bottom + edge
+                else -> 0f
+            }
+            if (distance != 0f) listState.scrollBy((distance / edge).coerceIn(-1f, 1f) * edge / 6f)
+        }
+    }
+    LazyColumn(modifier.fillMaxSize().onGloballyPositioned { viewport = it.boundsInRoot() }, state = listState,
+        contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { Text("Make it yours.", style = MaterialTheme.typography.headlineSmall) }
         item { SettingsSection("OpenRouter") {
             Text(if (keyPresent) "API key saved with Android Keystore encryption." else "Bring your own key. No account with Notedown is needed.")
@@ -44,21 +67,12 @@ import java.util.UUID
         } }
         item { SettingsSection("Cleanup profiles") {
             Text("Tap a profile below the floating recording controls to finish and clean up. The check mark transcribes without cleanup. Other saved profiles are available under More.")
-            settings.cleanupProfiles.forEachIndexed { index, profile ->
-                HorizontalDivider()
-                SettingSwitch(profile.name, "Show below recording controls", profile.shortcut) { vm.profileShortcut(profile.id, it) }
-                if (profile.model.isBlank()) Text("Choose a cleanup model before using this profile.", style = MaterialTheme.typography.bodySmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { editingProfile = profile }) { Text("Edit") }
-                    TextButton(onClick = { vm.moveProfile(profile.id, -1) }, enabled = index > 0) { Text("Up") }
-                    TextButton(onClick = { vm.moveProfile(profile.id, 1) }, enabled = index < settings.cleanupProfiles.lastIndex) { Text("Down") }
-                }
-            }
+            Text("Drag a profile's handle up or down to reorder it.", style = MaterialTheme.typography.bodySmall)
+            CleanupProfileList(settings.cleanupProfiles, vm::moveProfile, { editingProfile = it }, vm::profileShortcut) { dragY = it }
             OutlinedButton(onClick = { editingProfile = CleanupProfile(UUID.randomUUID().toString(), "") }) { Text("Add profile") }
         } }
-        item { SettingsSection("Floating microphone") {
-            SettingSwitch("Show near the keyboard", "Requires Notedown's accessibility service.", settings.overlay) { vm.flag("overlay", it) }
-            SettingSwitch("Position on the left", "Choose which edge the microphone docks to.", settings.left) { vm.flag("left", it) }
+        item { SettingsSection("Floating Button") {
+            SettingSwitch("Enable floating button above keyboard", "Requires Notedown's accessibility service.", settings.overlay) { vm.flag("overlay", it) }
             Text("Drag the floating microphone to move it. It snaps to the nearest side and remembers its position.", style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = vm::resetOverlayPosition) { Text("Reset position above keyboard") }
             Text("Finished dictation is inserted at the cursor in whichever text field is focused when processing completes. If no supported field is focused, use Copy or history.", style = MaterialTheme.typography.bodySmall)
