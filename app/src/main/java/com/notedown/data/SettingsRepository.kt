@@ -26,7 +26,22 @@ internal class CleanupProfilesMigration : DataMigration<Preferences> {
     }
     override suspend fun cleanUp() = Unit
 }
-private val Context.preferences by preferencesDataStore("settings", produceMigrations = { listOf(CleanupProfilesMigration()) })
+internal class MarkdownChecklistMigration : DataMigration<Preferences> {
+    private fun needsUpdate(profile: CleanupProfile) = profile.id == "checklist" && profile.prompt == LEGACY_CHECKLIST_PROMPT
+    override suspend fun shouldMigrate(currentData: Preferences): Boolean =
+        currentData[profilesKey]?.let { decodeProfiles(it).any(::needsUpdate) } ?: false
+    override suspend fun migrate(currentData: Preferences): Preferences = currentData.toMutablePreferences().apply {
+        currentData[profilesKey]?.let { value ->
+            this[profilesKey] = encodeProfiles(decodeProfiles(value).map {
+                if (needsUpdate(it)) it.copy(prompt = CHECKLIST_PROMPT) else it
+            })
+        }
+    }
+    override suspend fun cleanUp() = Unit
+}
+private val Context.preferences by preferencesDataStore("settings", produceMigrations = {
+    listOf(CleanupProfilesMigration(), MarkdownChecklistMigration())
+})
 data class Settings(val model: String = "", val cleanup: Boolean = false, val cleanupModel: String = "", val prompt: String = DEFAULT_PROMPT,
     val language: String = "", val overlay: Boolean = true, val left: Boolean = false, val wav: Boolean = false,
     val overlayVerticalFraction: Float? = null, val skipSilence: Boolean = false,

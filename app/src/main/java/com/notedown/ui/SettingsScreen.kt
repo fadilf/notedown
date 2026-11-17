@@ -38,8 +38,8 @@ import java.util.UUID
             ModelPicker("Default model", settings.model, models["transcription"].orEmpty()) { vm.text("model", it) }
             var language by remember(settings.language) { mutableStateOf(settings.language) }
             OutlinedTextField(language, { language = it.take(2).lowercase(); vm.text("language", language) }, label = { Text("Language (ISO code, blank = auto)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            SettingSwitch("WAV compatibility mode", "Use uncompressed WAV for providers that reject M4A. Also converts saved M4A when retranscribing.", settings.wav) { vm.flag("wav", it) }
-            SettingSwitch("Skip silence before transcription", "Remove long pauses locally from an upload copy. Keeps the original recording. Uploads WAV, which can be larger than M4A.", settings.skipSilence) { vm.flag("skipSilence", it) }
+            SettingSwitch("WAV compatibility mode", "Use WAV for recordings and untrimmed uploads. Turn off Skip silence for WAV-only providers.", settings.wav) { vm.flag("wav", it) }
+            SettingSwitch("Skip silence before transcription", "Faster on slow connections and slightly cheaper. Trims pauses and compresses uploads; keeps original recordings.", settings.skipSilence) { vm.flag("skipSilence", it) }
             TextButton(onClick = vm::refresh, enabled = !busy) { Text(if (busy) "Contacting OpenRouter…" else "Refresh available models") }
         } }
         item { SettingsSection("Cleanup profiles") {

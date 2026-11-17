@@ -9,6 +9,20 @@ import org.junit.Test
 class CleanupProfilesTest {
     private val key = stringPreferencesKey("cleanupProfiles")
 
+    @Test fun checklistUpgradeFixesOnlyTheUnmodifiedStarterPrompt() = runTest {
+        val original = CleanupProfile("checklist", "My tasks", LEGACY_CHECKLIST_PROMPT, "saved/model", false)
+        val custom = CleanupProfile("custom", "Custom checklist", LEGACY_CHECKLIST_PROMPT, "other/model")
+        val migration = MarkdownChecklistMigration()
+        val before = preferencesOf(key to encodeProfiles(listOf(original, custom)))
+        assertTrue(migration.shouldMigrate(before))
+        val after = migration.migrate(before)
+        assertEquals(listOf(original.copy(prompt = CHECKLIST_PROMPT), custom), decodeProfiles(after[key]!!))
+        assertFalse(migration.shouldMigrate(after))
+        val edited = preferencesOf(key to encodeProfiles(listOf(original.copy(prompt = "My custom instructions"))))
+        assertFalse(migration.shouldMigrate(edited))
+        assertFalse(migration.shouldMigrate(preferencesOf(key to encodeProfiles(emptyList()))))
+    }
+
     @Test fun upgradePreservesCustomPromptModelAndShortcutPreference() = runTest {
         val migration = CleanupProfilesMigration()
         val old = preferencesOf(

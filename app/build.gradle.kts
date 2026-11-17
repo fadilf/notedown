@@ -32,6 +32,10 @@ android {
     testOptions { unitTests.isIncludeAndroidResources = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    // Optional native encoder for opt-in experiments; never packaged in the application.
+    providers.gradleProperty("codecLabJniDir").orNull?.let {
+        sourceSets.getByName("androidTest").jniLibs.directories.add(file(it).absolutePath)
+    }
 }
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 dependencies {

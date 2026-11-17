@@ -72,7 +72,8 @@ class OverlayManager(private val service: AccessibilityService, private val star
                 }
             }
             orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
-            elevation = dp(8).toFloat()
+            clipChildren = false
+            clipToPadding = false
         }.also {
             val p = WindowManager.LayoutParams(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -81,14 +82,20 @@ class OverlayManager(private val service: AccessibilityService, private val star
         }
         val idle = state == DictationState.Idle
         layout.alpha = if (idle) 0.75f else 1f
-        layout.setPadding(if (idle) 0 else dp(6), if (idle) 0 else dp(4), if (idle) 0 else dp(6), if (idle) 0 else dp(4))
-        layout.background = if (idle) null else GradientDrawable().apply {
-            setColor(charcoal); cornerRadius = dp(28).toFloat()
-        }
+        layout.setPadding(0, 0, 0, 0)
+        layout.background = null
         layout.removeAllViews()
         timer = null
         layout.scrollArea = null
-        val controls = LinearLayout(service).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val controls = LinearLayout(service).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            if (!idle) {
+                setPadding(dp(6), dp(4), dp(6), dp(4))
+                background = GradientDrawable().apply { setColor(charcoal); cornerRadius = dp(28).toFloat() }
+                elevation = dp(8).toFloat()
+            }
+        }
         layout.addView(controls)
         fun label(text: String): TextView = TextView(service).apply {
             this.text = text; setTextColor(cream); setPadding(dp(8),0,dp(8),0)
@@ -133,25 +140,45 @@ class OverlayManager(private val service: AccessibilityService, private val star
             }, LinearLayout.LayoutParams(dp(52), dp(52)))
             DictationState.Starting -> Unit
             is DictationState.Recording -> {
+                controls.contentDescription = "Recording controls"
                 timer = label("● ${elapsed / 60}:${(elapsed % 60).toString().padStart(2,'0')}")
                 iconButton(R.drawable.ic_check, "Stop without cleanup", stop)
                 iconButton(R.drawable.ic_close, "Cancel", cancel)
+                // Size every detached profile pill from the recording pill, including its padding.
+                controls.measure(View.MeasureSpec.makeMeasureSpec((placement.right - placement.left).coerceAtLeast(1), View.MeasureSpec.AT_MOST),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+                val pillWidth = controls.measuredWidth
+                val pillHeight = controls.measuredHeight
+                controls.layoutParams = LinearLayout.LayoutParams(pillWidth, pillHeight)
                 val shortcuts = profiles.filter { it.shortcut }
                 val others = profiles.filterNot { it.shortcut }
                 if (shortcuts.isNotEmpty() || others.isNotEmpty()) {
-                    val scroll = ScrollView(service)
+                    val scroll = ScrollView(service).apply {
+                        background = null
+                        isVerticalScrollBarEnabled = false
+                    }
                     val choices = LinearLayout(service).apply { orientation = LinearLayout.VERTICAL }
                     scroll.addView(choices)
                     fun choice(text: String, description: String = text, click: () -> Unit) {
                         choices.addView(Button(service).apply {
                             this.text = text
                             contentDescription = description
-                            minimumHeight = dp(48)
-                            maxLines = 2
-                            backgroundTintList = ColorStateList.valueOf(cream)
+                            minWidth = 0
+                            minimumWidth = 0
+                            minHeight = 0
+                            minimumHeight = 0
+                            isAllCaps = false
+                            setSingleLine()
+                            ellipsize = android.text.TextUtils.TruncateAt.END
+                            setPadding(dp(16), 0, dp(16), 0)
+                            background = RippleDrawable(ColorStateList.valueOf(0x3316181D), GradientDrawable().apply {
+                                setColor(cream); cornerRadius = pillHeight / 2f
+                            }, null)
                             setTextColor(charcoal)
                             setOnClickListener { click() }
-                        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+                        }, LinearLayout.LayoutParams(pillWidth, pillHeight).apply {
+                            if (choices.childCount > 0) topMargin = dp(8)
+                        })
                     }
                     (if (moreOpen) others else shortcuts).forEach { profile ->
                         choice(profile.name, "Stop and apply ${profile.name}") {
@@ -163,10 +190,10 @@ class OverlayManager(private val service: AccessibilityService, private val star
                         moreOpen = !moreOpen
                         layout.post { show(state, keyboardTop, left, fraction, elapsed, profiles) }
                     }
-                    val available = (placement.bottom - placement.top - dp(64)).coerceAtLeast(0)
+                    val available = (placement.bottom - placement.top - pillHeight - dp(8)).coerceAtLeast(0)
                     val rows = (if (moreOpen) others.size else shortcuts.size) + if (others.isNotEmpty()) 1 else 0
-                    layout.addView(scroll, LinearLayout.LayoutParams(dp(220).coerceAtMost((placement.right - placement.left).coerceAtLeast(1)),
-                        minOf(dp(240), available, dp(64) * rows)))
+                    layout.addView(scroll, LinearLayout.LayoutParams(pillWidth,
+                        minOf(dp(240), available, pillHeight * rows + dp(8) * (rows - 1))).apply { topMargin = dp(8) })
                     layout.scrollArea = scroll
                 }
             }

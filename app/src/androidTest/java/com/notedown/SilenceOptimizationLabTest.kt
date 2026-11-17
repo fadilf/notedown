@@ -280,7 +280,21 @@ class SilenceOptimizationLabTest {
                     override suspend fun transcribe(key: String, model: RequestBody, file: MultipartBody.Part, language: RequestBody?): TranscriptionResponse {
                         requests++
                         val body = Buffer().also { file.body.writeTo(it) }.readByteArray()
-                        check(body.contentEquals(expected)) { "Upload differs from expected fallback" }
+                        if (name == "stress_silence") {
+                            check(body.contentEquals(expected)) { "Upload differs from expected fallback" }
+                        } else {
+                            check(file.body.contentType().toString() == "audio/mp4")
+                            val captured = File(root, "upload-check.m4a")
+                            val decoded = File(root, "upload-check.wav")
+                            try {
+                                captured.writeBytes(body)
+                                WavConverter().convert(captured, decoded)
+                                val expectedSeconds = (expected.size - 44) / 32000.0
+                                val actualSeconds = (decoded.length() - 44) / 32000.0
+                                check(actualSeconds + 0.0000625 >= expectedSeconds && actualSeconds - expectedSeconds <= 0.2560625)
+                                check(body.size < expected.size / 2)
+                            } finally { captured.delete(); decoded.delete() }
+                        }
                         return TranscriptionResponse("")
                     }
                 }

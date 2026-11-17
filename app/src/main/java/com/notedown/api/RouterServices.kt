@@ -2,6 +2,7 @@ package com.notedown.api
 
 import com.notedown.data.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -20,7 +21,7 @@ fun safeApiError(error: Throwable): String = when (error) {
         404 -> "Model unavailable. Refresh models and select another."
         413 -> "Audio exceeds provider size limits. Use a shorter recording."
         429 -> "Rate limited. Wait before retrying."
-        400, 415, 422 -> "Provider rejected the audio or options. Try WAV compatibility mode, another language, or another model."
+        400, 415, 422 -> "Provider rejected audio or options. Try WAV mode with Skip silence off, another language, or another model."
         in 500..599 -> "OpenRouter or its provider is temporarily unavailable. Retry later."
         else -> "OpenRouter request failed (HTTP ${error.code()})."
     }
@@ -30,7 +31,8 @@ fun safeApiError(error: Throwable): String = when (error) {
 }
 fun reportedCost(usage: JsonObject?): String? = usage?.get("cost")?.jsonPrimitive?.contentOrNull?.let { runCatching { it.toBigDecimal().toPlainString() }.getOrNull() }
 class TranscriptionService @Inject constructor(private val api: OpenRouterApi, private val keys: ApiKeyStorage,
-    private val silenceFilter: com.notedown.audio.SilenceFilter) {
+    private val silenceFilter: com.notedown.audio.SilenceFilter,
+    private val aacEncoder: com.notedown.audio.AacEncoder = com.notedown.audio.AacEncoder()) {
     suspend fun transcribe(recording: RecordingEntity, settings: Settings): TranscriptionResponse = withContext(Dispatchers.IO) {
         require(settings.model.isNotBlank()) { "Select a transcription model in Settings." }
         val file = File(recording.filePath)
@@ -38,6 +40,7 @@ class TranscriptionService @Inject constructor(private val api: OpenRouterApi, p
         require(file.length() < 25L * 1024 * 1024) { "Recording exceeds the 25 MB upload limit." }
         val converted = if ((settings.wav || settings.skipSilence) && recording.audioFormat != "wav") File.createTempFile("notedown-converted-", ".wav", file.parentFile) else null
         var filtered: File? = null
+        var compressed: File? = null
         try {
         if (converted != null && !settings.skipSilence) com.notedown.audio.WavConverter().convert(file, converted)
         var upload = converted ?: file
@@ -50,14 +53,27 @@ class TranscriptionService @Inject constructor(private val api: OpenRouterApi, p
             }
             catch (e: kotlinx.coroutines.CancellationException) { throw e }
             catch (_: Exception) { throw IllegalStateException("Silence removal failed. Retry or turn off Skip silence in Settings.") }
-            if (trimmed) upload = candidate else if (!settings.wav) upload = file
+            if (trimmed) {
+                val encoded = try {
+                    File.createTempFile("notedown-converted-compressed-", ".m4a", file.parentFile).also {
+                        compressed = it
+                        aacEncoder.encode(candidate, it)
+                    }
+                }
+                catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (_: Exception) { throw IllegalStateException("Audio compression failed. Retry or turn off Skip silence in Settings.") }
+                upload = encoded
+            } else if (!settings.wav) upload = file
         }
         require(upload.length() < 25L * 1024 * 1024) { "Prepared audio exceeds the 25 MB upload limit." }
         val mime = if (upload.extension == "wav") "audio/wav" else "audio/mp4"
-        api.transcribe("Bearer ${keys.read() ?: error("Add an API key in Settings.")}", settings.model.toRequestBody("text/plain".toMediaType()),
-            MultipartBody.Part.createFormData("file", upload.name, upload.asRequestBody(mime.toMediaType())),
-            settings.language.takeIf { it.isNotBlank() }?.toRequestBody("text/plain".toMediaType()))
-        } finally { filtered?.delete(); converted?.delete() }
+        val authorization = "Bearer ${keys.read() ?: error("Add an API key in Settings.")}"
+        val model = settings.model.toRequestBody("text/plain".toMediaType())
+        val part = MultipartBody.Part.createFormData("file", upload.name, upload.asRequestBody(mime.toMediaType()))
+        val language = settings.language.takeIf { it.isNotBlank() }?.toRequestBody("text/plain".toMediaType())
+        ensureActive()
+        api.transcribe(authorization, model, part, language)
+        } finally { compressed?.delete(); filtered?.delete(); converted?.delete() }
     }
 }
 class CleanupService @Inject constructor(private val api: OpenRouterApi, private val keys: ApiKeyStorage) {

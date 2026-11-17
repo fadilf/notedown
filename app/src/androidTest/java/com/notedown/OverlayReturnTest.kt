@@ -78,6 +78,7 @@ class OverlayReturnTest {
         try {
             runBlocking {
                 repository.saveProfile(CleanupProfile("overlay-shortcut-test", "Shortcut test"))
+                repository.moveProfile("overlay-shortcut-test", -originalPosition.cleanupProfiles.size)
                 repository.saveProfile(CleanupProfile("overlay-more-test", "More test", shortcut = false))
             }
             automation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
@@ -167,6 +168,12 @@ class OverlayReturnTest {
             }
             assertTrue("Recording should still be running", overlayButton("Stop without cleanup") != null)
             assertNotNull(overlayButton("Stop and apply Shortcut test"))
+            val recordingPill = Rect().also { checkNotNull(overlayButton("Recording controls")).getBoundsInScreen(it) }
+            val profilePill = Rect().also { checkNotNull(overlayButton("Stop and apply Shortcut test")).getBoundsInScreen(it) }
+            assertEquals("Profile pill matches control pill width", recordingPill.width(), profilePill.width())
+            assertEquals("Profile pill matches control pill height", recordingPill.height(), profilePill.height())
+            assertEquals("Pills align vertically", recordingPill.left, profilePill.left)
+            assertTrue("Separate pills have a transparent gap", profilePill.top > recordingPill.bottom)
             assertNull(overlayButton("Stop and apply More test"))
             assertTrue(checkNotNull(overlayButton("More…")).performAction(AccessibilityNodeInfo.ACTION_CLICK))
             await("other profiles in More") { overlayButton("Stop and apply More test") != null }
