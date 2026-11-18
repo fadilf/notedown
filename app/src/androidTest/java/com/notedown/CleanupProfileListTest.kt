@@ -18,7 +18,10 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.notedown.data.CleanupProfile
+import com.notedown.data.CleanupProfileIcon
 import com.notedown.ui.CleanupProfileList
+import com.notedown.ui.CleanupProfileIconPicker
+import com.notedown.ui.drawableResource
 import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.*
 import org.junit.Test
@@ -26,6 +29,52 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class CleanupProfileListTest {
+    @Test fun iconPickerDefaultsToCleanupAndChangesTheSelection() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val automation = instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
+        automation.serviceInfo = automation.serviceInfo.apply {
+            flags = flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+        }
+        val chosen = AtomicReference(CleanupProfileIcon.CLEANUP)
+        fun find(node: AccessibilityNodeInfo?, text: String): AccessibilityNodeInfo? {
+            if (node == null) return null
+            if (node.text?.toString() == text) return node
+            for (index in 0 until node.childCount) find(node.getChild(index), text)?.let { return it }
+            return null
+        }
+        fun click(text: String) {
+            val deadline = SystemClock.uptimeMillis() + 5000
+            while (SystemClock.uptimeMillis() < deadline) {
+                if (android.os.Build.VERSION.SDK_INT >= 33) automation.clearCache()
+                var node = automation.windows.firstNotNullOfOrNull { find(it.root, text) }
+                while (node != null && !node.isClickable) node = node.parent
+                if (node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) return
+                SystemClock.sleep(50)
+            }
+            fail("Missing icon picker action: $text")
+        }
+        CleanupProfileIcon.entries.forEach {
+            val drawable = checkNotNull(instrumentation.targetContext.getDrawable(it.drawableResource))
+            assertTrue(drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0)
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity -> activity.setContent {
+                var selected by remember { mutableStateOf(CleanupProfileIcon.CLEANUP) }
+                MaterialTheme { Column(Modifier.safeDrawingPadding().padding(16.dp)) {
+                    CleanupProfileIconPicker(selected) { selected = it; chosen.set(it) }
+                } }
+            } }
+            click("Profile icon: Cleanup")
+            click("Email")
+            instrumentation.waitForIdleSync()
+            assertEquals(CleanupProfileIcon.EMAIL, chosen.get())
+            click("Profile icon: Email")
+            click("Cleanup")
+            instrumentation.waitForIdleSync()
+            assertEquals(CleanupProfileIcon.CLEANUP, chosen.get())
+        }
+    }
+
     @Test fun dragReordersBothDirectionsAndCancelRestoresOrderWithoutEditingOrToggling() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val automation = instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)

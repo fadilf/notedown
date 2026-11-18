@@ -38,7 +38,7 @@ class PersistenceTest {
     @Test fun settingsPersistAcrossRepositoryInstances() = runBlocking {
         val first = SettingsRepository(context)
         val original = first.settings.first()
-        val profile = CleanupProfile("persistence-test", "Test profile", "Use short sentences.", "text/model", false)
+        val profile = CleanupProfile("persistence-test", "Test profile", "Use short sentences.", "text/model", false, CleanupProfileIcon.EMAIL)
         try {
             first.text("model", "chosen/model")
             first.saveProfile(profile)
@@ -50,6 +50,7 @@ class PersistenceTest {
             first.moveProfile(profile.id, -1)
             val changed = first.settings.first().cleanupProfiles
             assertTrue(changed.single { it.id == profile.id }.shortcut)
+            assertEquals(CleanupProfileIcon.EMAIL, changed.single { it.id == profile.id }.icon)
             assertEquals((second.cleanupProfiles.size - 2).coerceAtLeast(0), changed.indexOfFirst { it.id == profile.id })
             first.deleteProfile(profile.id)
             assertFalse(first.settings.first().cleanupProfiles.any { it.id == profile.id })

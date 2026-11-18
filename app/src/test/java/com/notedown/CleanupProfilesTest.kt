@@ -9,6 +9,21 @@ import org.junit.Test
 class CleanupProfilesTest {
     private val key = stringPreferencesKey("cleanupProfiles")
 
+    @Test fun profilesWithoutIconsKeepTheirSettingsAndUseCleanupIcon() {
+        val old = """[{"id":"custom","name":"Saved profile","prompt":"Keep my instructions.","model":"saved/model","shortcut":false}]"""
+        val restored = decodeProfiles(old).single()
+        assertEquals(CleanupProfile("custom", "Saved profile", "Keep my instructions.", "saved/model", false), restored)
+        assertEquals(CleanupProfileIcon.CLEANUP, restored.icon)
+        assertEquals(CleanupProfileIcon.CLEANUP, CleanupProfile("new", "New").icon)
+    }
+
+    @Test fun iconSelectionsRoundTripAndUnknownIconsFallBackWithoutLosingProfiles() {
+        val profiles = CleanupProfileIcon.entries.map { icon -> CleanupProfile(icon.name, icon.name, icon = icon) }
+        assertEquals(profiles, decodeProfiles(encodeProfiles(profiles)))
+        val futureIcon = """[{"id":"custom","name":"Saved profile","icon":"FUTURE_ICON"}]"""
+        assertEquals(CleanupProfileIcon.CLEANUP, decodeProfiles(futureIcon).single().icon)
+    }
+
     @Test fun checklistUpgradeFixesOnlyTheUnmodifiedStarterPrompt() = runTest {
         val original = CleanupProfile("checklist", "My tasks", LEGACY_CHECKLIST_PROMPT, "saved/model", false)
         val custom = CleanupProfile("custom", "Custom checklist", LEGACY_CHECKLIST_PROMPT, "other/model")

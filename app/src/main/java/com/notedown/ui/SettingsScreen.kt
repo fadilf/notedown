@@ -66,7 +66,7 @@ import java.util.UUID
             TextButton(onClick = vm::refresh, enabled = !busy) { Text(if (busy) "Contacting OpenRouter…" else "Refresh available models") }
         } }
         item { SettingsSection("Cleanup profiles") {
-            Text("Tap a profile below the floating recording controls to finish and clean up. The check mark transcribes without cleanup. Other saved profiles are available under More.")
+            Text("Tap the menu pill below the recording timer to reveal cleanup profiles, then choose one to finish and clean up. The check mark transcribes without cleanup. Other saved profiles are available under More.")
             Text("Drag a profile's handle up or down to reorder it.", style = MaterialTheme.typography.bodySmall)
             CleanupProfileList(settings.cleanupProfiles, vm::moveProfile, { editingProfile = it }, vm::profileShortcut) { dragY = it }
             OutlinedButton(onClick = { editingProfile = CleanupProfile(UUID.randomUUID().toString(), "") }) { Text("Add profile") }
@@ -105,6 +105,7 @@ import java.util.UUID
     AlertDialog(onDismissRequest = dismiss, title = { Text(if (existing) "Edit profile" else "Add profile") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(draft.name, { draft = draft.copy(name = it.take(80)) }, label = { Text("Name") }, singleLine = true)
+            CleanupProfileIconPicker(draft.icon) { draft = draft.copy(icon = it) }
             ModelPicker("Cleanup model", draft.model, models) { draft = draft.copy(model = it) }
             OutlinedTextField(draft.prompt, { draft = draft.copy(prompt = it.take(3000)) }, label = { Text("Cleanup instructions") }, minLines = 4)
             SettingSwitch("Show shortcut", "Below the floating recording controls", draft.shortcut) { draft = draft.copy(shortcut = it) }

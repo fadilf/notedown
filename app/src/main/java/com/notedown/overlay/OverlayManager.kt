@@ -14,6 +14,8 @@ import android.widget.*
 import com.notedown.R
 import com.notedown.domain.DictationState
 import com.notedown.data.CleanupProfile
+import com.notedown.data.CleanupProfileIcon
+import com.notedown.ui.drawableResource
 
 class OverlayManager(private val service: AccessibilityService, private val start: (Rect) -> Unit, private val stop: () -> Unit,
     private val cancel: () -> Unit, private val retry: (String) -> Unit, private val dismiss: () -> Unit,
@@ -31,6 +33,7 @@ class OverlayManager(private val service: AccessibilityService, private val star
     private var dragOrigin: Pair<Int, Int>? = null
     private var timer: TextView? = null
     private var moreOpen = false
+    private var profilesExpanded = false
     private fun dp(value: Int) = (value * service.resources.displayMetrics.density).toInt()
     fun show(state: DictationState, keyboardTop: Int?, left: Boolean, fraction: Float?, elapsed: Long = 0,
         profiles: List<CleanupProfile> = emptyList()) {
@@ -46,8 +49,8 @@ class OverlayManager(private val service: AccessibilityService, private val star
         }
         placement = safePlacement(keyboardTop)
         timer?.text = "● ${elapsed / 60}:${(elapsed % 60).toString().padStart(2,'0')}"
-        if (state !is DictationState.Recording) moreOpen = false
-        val signature = "$state/$placement/$position/$profiles/$moreOpen"
+        if (state !is DictationState.Recording) { moreOpen = false; profilesExpanded = false }
+        val signature = "$state/$placement/$position/$profiles/$moreOpen/$profilesExpanded"
         if (lastRender == signature && view != null) return
         lastRender = signature
         val layout = view ?: DraggableOverlayLayout(service).apply {
@@ -168,14 +171,29 @@ class OverlayManager(private val service: AccessibilityService, private val star
                 controls.layoutParams = LinearLayout.LayoutParams(pillWidth, pillHeight)
                 val shortcuts = profiles.filter { it.shortcut }
                 val others = profiles.filterNot { it.shortcut }
-                if (shortcuts.isNotEmpty() || others.isNotEmpty()) {
+                if (profiles.isNotEmpty() && !profilesExpanded) {
+                    layout.addView(ImageButton(service).apply {
+                        setImageResource(R.drawable.ic_menu)
+                        imageTintList = ColorStateList.valueOf(charcoal)
+                        setPadding(dp(12), dp(12), dp(12), dp(12))
+                        background = RippleDrawable(ColorStateList.valueOf(0x3316181D), GradientDrawable().apply {
+                            setColor(cream); cornerRadius = pillHeight / 2f
+                        }, null)
+                        elevation = dp(8).toFloat()
+                        contentDescription = "Show cleanup profiles"
+                        setOnClickListener {
+                            profilesExpanded = true
+                            layout.post { show(state, keyboardTop, left, fraction, elapsed, profiles) }
+                        }
+                    }, LinearLayout.LayoutParams(checkNotNull(timer).measuredWidth, pillHeight).apply { topMargin = dp(8) })
+                } else if (profiles.isNotEmpty()) {
                     val scroll = ScrollView(service).apply {
                         background = null
                         isVerticalScrollBarEnabled = false
                     }
                     val choices = LinearLayout(service).apply { orientation = LinearLayout.VERTICAL }
                     scroll.addView(choices)
-                    fun choice(text: String, description: String = text, click: () -> Unit) {
+                    fun choice(text: String, description: String = text, icon: CleanupProfileIcon? = null, click: () -> Unit) {
                         choices.addView(Button(service).apply {
                             this.text = text
                             contentDescription = description
@@ -187,6 +205,14 @@ class OverlayManager(private val service: AccessibilityService, private val star
                             setSingleLine()
                             ellipsize = android.text.TextUtils.TruncateAt.END
                             setPadding(dp(16), 0, dp(16), 0)
+                            icon?.let {
+                                val drawable = checkNotNull(service.getDrawable(it.drawableResource)).mutate().apply {
+                                    setTint(charcoal)
+                                    setBounds(0, 0, dp(20), dp(20))
+                                }
+                                setCompoundDrawablesRelative(drawable, null, null, null)
+                                compoundDrawablePadding = dp(12)
+                            }
                             background = RippleDrawable(ColorStateList.valueOf(0x3316181D), GradientDrawable().apply {
                                 setColor(cream); cornerRadius = pillHeight / 2f
                             }, null)
@@ -197,7 +223,7 @@ class OverlayManager(private val service: AccessibilityService, private val star
                         })
                     }
                     (if (moreOpen) others else shortcuts).forEach { profile ->
-                        choice(profile.name, "Stop and apply ${profile.name}") {
+                        choice(profile.name, "Stop and apply ${profile.name}", profile.icon) {
                             if (profile.model.isBlank()) Toast.makeText(service, "Choose a cleanup model for ${profile.name} in Settings.", Toast.LENGTH_LONG).show()
                             else finishWithProfile(profile)
                         }
@@ -253,5 +279,5 @@ class OverlayManager(private val service: AccessibilityService, private val star
         })
         Toast.makeText(service, "Transcript copied", Toast.LENGTH_SHORT).show()
     }
-    fun hide() { view?.let { wm.removeView(it) }; view = null; params = null; dragOrigin = null; lastRender = null; timer = null; moreOpen = false }
+    fun hide() { view?.let { wm.removeView(it) }; view = null; params = null; dragOrigin = null; lastRender = null; timer = null; moreOpen = false; profilesExpanded = false }
 }

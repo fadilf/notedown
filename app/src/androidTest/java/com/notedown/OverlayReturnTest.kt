@@ -167,7 +167,7 @@ class OverlayReturnTest {
                 automation.windows.any { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive && it.root?.packageName?.toString() == instrumentation.context.packageName }
             }
             assertTrue("Recording should still be running", overlayButton("Stop without cleanup") != null)
-            assertNotNull(overlayButton("Stop and apply Shortcut test"))
+            assertNull("Profiles start hidden", overlayButton("Stop and apply Shortcut test"))
             val recordingPill = Rect().also { checkNotNull(overlayButton("Recording controls")).getBoundsInScreen(it) }
             val cancelPill = Rect().also { checkNotNull(overlayButton("Cancel")).getBoundsInScreen(it) }
             val timePill = Rect().also { checkNotNull(overlayButton("Elapsed recording time")).getBoundsInScreen(it) }
@@ -180,11 +180,21 @@ class OverlayReturnTest {
             assertTrue("Center time pill is wider than the icon buttons", timePill.width() > cancelPill.width())
             assertEquals(recordingPill.left, cancelPill.left)
             assertEquals(recordingPill.right, finishPill.right)
+            val menuPill = Rect().also { checkNotNull(overlayButton("Show cleanup profiles")).getBoundsInScreen(it) }
+            assertEquals("Menu pill matches timer width", timePill.width(), menuPill.width())
+            assertEquals("Menu pill aligns beneath timer", timePill.centerX(), menuPill.centerX())
+            assertEquals(timePill.height(), menuPill.height())
+            assertTrue("Menu pill is separated below timer", menuPill.top > timePill.bottom)
+            assertTrue(checkNotNull(overlayButton("Show cleanup profiles")).performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            await("profile pills replace the menu") { overlayButton("Stop and apply Shortcut test") != null }
+            assertNull("Menu is replaced, not added to the list", overlayButton("Show cleanup profiles"))
+            assertNotNull("Opening menu keeps recording", overlayButton("Stop without cleanup"))
+            val expandedRecordingPill = Rect().also { checkNotNull(overlayButton("Recording controls")).getBoundsInScreen(it) }
             val profilePill = Rect().also { checkNotNull(overlayButton("Stop and apply Shortcut test")).getBoundsInScreen(it) }
-            assertEquals("Profile pill matches control pill width", recordingPill.width(), profilePill.width())
-            assertEquals("Profile pill matches control pill height", recordingPill.height(), profilePill.height())
-            assertEquals("Pills align vertically", recordingPill.left, profilePill.left)
-            assertTrue("Separate pills have a transparent gap", profilePill.top > recordingPill.bottom)
+            assertEquals("Profile pill matches control pill width", expandedRecordingPill.width(), profilePill.width())
+            assertEquals("Profile pill matches control pill height", expandedRecordingPill.height(), profilePill.height())
+            assertEquals("Pills align vertically", expandedRecordingPill.left, profilePill.left)
+            assertTrue("Separate pills have a transparent gap", profilePill.top > expandedRecordingPill.bottom)
             assertNull(overlayButton("Stop and apply More test"))
             assertTrue(checkNotNull(overlayButton("More…")).performAction(AccessibilityNodeInfo.ACTION_CLICK))
             await("other profiles in More") { overlayButton("Stop and apply More test") != null }
@@ -206,6 +216,11 @@ class OverlayReturnTest {
             }
             assertTrue("Expanded controls should stay on-screen: $controls", controls.left >= 0 && controls.top >= 0 &&
                 controls.right <= screenWidth && controls.bottom <= context.resources.displayMetrics.heightPixels)
+            assertTrue(checkNotNull(overlayButton("Cancel")).performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            await("idle after cancelling") { overlayButton("Start voice dictation") != null }
+            assertTrue(checkNotNull(overlayButton("Start voice dictation")).performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            await("new recording starts collapsed") { overlayButton("Show cleanup profiles") != null }
+            assertNull(overlayButton("Stop and apply Shortcut test"))
         } finally {
             instrumentation.runOnMainSync {
                 ActivityLifecycleMonitorRegistry.getInstance().removeLifecycleCallback(captureLifecycle)
