@@ -14,6 +14,39 @@ You can also record inside Notedown and copy the result later. No Notedown accou
 
 APKs appear here after the first automated release. If no release is available yet, you can [build the app yourself](#development).
 
+## Screenshots
+
+Record in another app, choose a cleanup profile, and insert the formatted result into your text field.
+
+<table>
+  <tr>
+    <th>Speak</th>
+    <th>Choose a format</th>
+    <th>Keep writing</th>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/floating-recording.jpg" alt="Notedown's floating recording timer, cancel button, check mark, and cleanup menu above the keyboard in a notes app" width="250"></td>
+    <td><img src="docs/assets/screenshots/cleanup-shortcuts.jpg" alt="Expanded floating cleanup menu with Simple cleanup, List, and Checklist profiles" width="250"></td>
+    <td><img src="docs/assets/screenshots/inserted-checklist.jpg" alt="A dictated four-item to-do list inserted as a checklist in the notes app" width="250"></td>
+  </tr>
+</table>
+
+<details>
+<summary>History and cleanup settings</summary>
+
+<table>
+  <tr>
+    <th>Revisit recordings</th>
+    <th>Customize cleanup profiles</th>
+  </tr>
+  <tr>
+    <td valign="top"><img src="docs/assets/screenshots/recording-history.jpg" alt="Notedown history showing the saved checklist, original transcript option, playback button, and transcription model" width="300"></td>
+    <td valign="top"><img src="docs/assets/screenshots/cleanup-profiles.jpg" alt="Cleanup profile settings with reorder handles, edit buttons, shortcut switches, and an Add profile button" width="300"></td>
+  </tr>
+</table>
+
+</details>
+
 ## What it does
 
 - Dictate into text fields in other apps.
